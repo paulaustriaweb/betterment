@@ -1,0 +1,102 @@
+import { addDays, addMonths, format } from 'date-fns';
+import * as Haptics from 'expo-haptics';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+
+import { colors, font, radius } from '@/lib/colors';
+import { PrimaryButton, Sheet } from './ui';
+
+interface Props {
+  visible: boolean;
+  onClose: () => void;
+  onSave: (title: string, deadlineIso: string) => void;
+}
+
+export function AddGoalSheet({ visible, onClose, onSave }: Props) {
+  const [title, setTitle] = useState('');
+  const [offset, setOffset] = useState(30);
+
+  const presets = useMemo(() => {
+    const now = new Date();
+    return [
+      { label: 'A week', days: 7, date: addDays(now, 7) },
+      { label: 'A month', days: 30, date: addMonths(now, 1) },
+      { label: '3 months', days: 90, date: addMonths(now, 3) },
+      { label: '6 months', days: 180, date: addMonths(now, 6) },
+    ];
+  }, []);
+
+  const deadline = presets.find((p) => p.days === offset)?.date ?? addDays(new Date(), 30);
+  const canSave = title.trim().length > 0;
+
+  function save() {
+    if (!canSave) return;
+    onSave(title.trim(), deadline.toISOString());
+    setTitle('');
+    setOffset(30);
+    onClose();
+  }
+
+  return (
+    <Sheet visible={visible} title="Add goal" subtitle="One thing, one date" onClose={onClose}>
+      <Text style={styles.label}>What are you aiming at?</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Finish the portfolio site"
+        placeholderTextColor={colors.inkFaint}
+        value={title}
+        onChangeText={setTitle}
+        returnKeyType="done"
+        onSubmitEditing={save}
+      />
+
+      <Text style={[styles.label, { marginTop: 22 }]}>Deadline</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+        {presets.map((p) => {
+          const active = p.days === offset;
+          return (
+            <Pressable
+              key={p.days}
+              style={[styles.chip, { backgroundColor: active ? colors.rose : colors.ground }]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setOffset(p.days);
+              }}
+            >
+              <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{p.label}</Text>
+              <Text style={[styles.chipDate, active && styles.chipDateActive]}>{format(p.date, 'MMM d')}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <Text style={styles.summary}>Due {format(deadline, 'EEEE, MMMM d')}</Text>
+
+      <View style={canSave ? undefined : styles.disabled} pointerEvents={canSave ? 'auto' : 'none'}>
+        <PrimaryButton label={canSave ? 'Save goal' : 'Name it first'} onPress={save} />
+      </View>
+    </Sheet>
+  );
+}
+
+const styles = StyleSheet.create({
+  label: { fontFamily: font.regular, fontSize: 11.5, color: colors.inkSoft, marginTop: 20 },
+  input: {
+    fontFamily: font.semibold,
+    fontSize: 17,
+    color: colors.ink,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+  },
+
+  chipRow: { gap: 8, paddingVertical: 10, alignItems: 'center' },
+  chip: { borderRadius: radius.chip, paddingVertical: 10, paddingHorizontal: 15, alignItems: 'center' },
+  chipLabel: { fontFamily: font.semibold, fontSize: 12.5, color: colors.ink },
+  chipLabelActive: { color: colors.surface },
+  chipDate: { fontFamily: font.regular, fontSize: 10.5, color: colors.inkSoft, marginTop: 2 },
+  chipDateActive: { color: 'rgba(255,255,255,0.8)' },
+
+  summary: { fontFamily: font.medium, fontSize: 12.5, color: colors.roseDeep, marginTop: 10, marginBottom: 20 },
+  disabled: { opacity: 0.4 },
+});
