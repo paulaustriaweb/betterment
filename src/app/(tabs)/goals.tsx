@@ -5,6 +5,7 @@ import { LayoutAnimation, Pressable, ScrollView, StyleSheet, Text, View } from '
 
 import { AddGoalSheet } from '@/components/AddGoalSheet';
 import { CheckIcon, GoalsIcon, PlusIcon } from '@/components/icons';
+import { SwipeRow } from '@/components/SwipeRow';
 import { DisclosureRow, PrimaryButton, ScreenHeader, Sheet } from '@/components/ui';
 import { useGoals } from '@/hooks/useGoals';
 import { colors, font, spacing, type } from '@/lib/colors';
@@ -129,14 +130,16 @@ export default function GoalsScreen() {
         ) : (
           <ScrollView style={styles.doneScroll}>
             {completed.map((g) => (
-              <Pressable key={g.id} style={styles.doneRow} onPress={() => toggle(g.id, false)} onLongPress={() => remove(g.id)}>
-                <View style={styles.doneCheck}>
-                  <CheckIcon color={colors.surface} size={13} strokeWidth={3} />
-                </View>
-                <Text style={styles.doneTitle}>{g.title}</Text>
-              </Pressable>
+              <SwipeRow key={g.id} onDelete={() => remove(g.id)}>
+                <Pressable style={styles.doneRow} onPress={() => toggle(g.id, false)}>
+                  <View style={styles.doneCheck}>
+                    <CheckIcon color={colors.surface} size={13} strokeWidth={3} />
+                  </View>
+                  <Text style={styles.doneTitle}>{g.title}</Text>
+                </Pressable>
+              </SwipeRow>
             ))}
-            <Text style={styles.hint}>Long-press to delete permanently.</Text>
+            <Text style={styles.hint}>Tap to restore · swipe left to delete</Text>
           </ScrollView>
         )}
       </Sheet>

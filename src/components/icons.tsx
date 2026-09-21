@@ -119,6 +119,16 @@ export function AlertIcon({ color, size = 16, strokeWidth = 2.2 }: IconProps) {
   );
 }
 
+export function TrashIcon({ color, size = 17, strokeWidth = 2.2 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" {...stroke(color, strokeWidth)}>
+      <Path d="M3 6h18" />
+      <Path d="M8 6V4h8v2" />
+      <Path d="M18.5 6 17.5 20H6.5L5.5 6" />
+    </Svg>
+  );
+}
+
 export function BellIcon({ color, size = 16, strokeWidth = 2 }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" {...stroke(color, strokeWidth)}>

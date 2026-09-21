@@ -8,6 +8,7 @@ import { CategoryChip } from '@/components/CategoryChip';
 import { DayTrack, type TrackBlock } from '@/components/DayTrack';
 import { NoteIcon, PlusIcon, TimelineIcon } from '@/components/icons';
 import { OverlapBanner } from '@/components/OverlapBanner';
+import { SwipeRow } from '@/components/SwipeRow';
 import { Card, DisclosureRow, PrimaryButton, ScreenHeader, Sheet, Stepper } from '@/components/ui';
 import type { TimeBlockInput } from '@/db/timeBlocks';
 import { useCategories } from '@/hooks/useCategories';
@@ -267,15 +268,18 @@ export default function LogScreen() {
         {blocks.length === 0 ? (
           <Text style={styles.empty}>Nothing logged yet. All 24 hours are still unaccounted for.</Text>
         ) : (
-          blocks.map((b) => (
-            <BlockRow
-              key={b.id}
-              block={b}
-              category={categories.find((c) => c.id === b.categoryId)}
-              onPress={() => handleEdit(b.id)}
-              onDelete={() => handleDelete(b.id)}
-            />
-          ))
+          <>
+            {blocks.map((b) => (
+              <SwipeRow key={b.id} onDelete={() => handleDelete(b.id)}>
+                <BlockRow
+                  block={b}
+                  category={categories.find((c) => c.id === b.categoryId)}
+                  onPress={() => handleEdit(b.id)}
+                />
+              </SwipeRow>
+            ))}
+            <Text style={styles.hint}>Tap to edit · swipe left to delete</Text>
+          </>
         )}
       </Sheet>
     </View>
@@ -341,4 +345,5 @@ const styles = StyleSheet.create({
   action: { marginTop: 16 },
 
   empty: { fontFamily: font.regular, fontSize: 13, color: colors.inkSoft, paddingVertical: 20, lineHeight: 19 },
+  hint: { fontFamily: font.regular, fontSize: 11, color: colors.inkFaint, paddingVertical: 14 },
 });

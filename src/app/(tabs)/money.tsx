@@ -15,6 +15,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AddTransactionSheet } from '@/components/AddTransactionSheet';
 import { Sparkline } from '@/components/Sparkline';
+import { SwipeRow } from '@/components/SwipeRow';
 import { MoneyIcon, PlusIcon } from '@/components/icons';
 import { DisclosureRow, PrimaryButton, RangePills, ScreenHeader, Sheet, StatCard } from '@/components/ui';
 import { moneyColor } from '@/constants/money';
@@ -164,24 +165,26 @@ export default function MoneyScreen() {
             {rows.map((t) => {
               const label = transactionLabel(t);
               return (
-                <Pressable key={t.id} style={styles.row} onLongPress={() => remove(t.id)}>
-                  <View style={[styles.rowChip, { backgroundColor: `${moneyColor(label)}22` }]}>
-                    <View style={[styles.dot, { backgroundColor: moneyColor(label) }]} />
+                <SwipeRow key={t.id} onDelete={() => remove(t.id)}>
+                  <View style={styles.row}>
+                    <View style={[styles.rowChip, { backgroundColor: `${moneyColor(label)}22` }]}>
+                      <View style={[styles.dot, { backgroundColor: moneyColor(label) }]} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rowLabel}>{label}</Text>
+                      <Text style={styles.rowDate}>{format(new Date(t.date), 'MMM d')}</Text>
+                    </View>
+                    <Text
+                      style={[styles.rowAmount, t.type === 'income' && styles.rowAmountIn]}
+                      numberOfLines={1}
+                    >
+                      {formatSigned(t.type === 'income' ? t.amount : -t.amount, currency)}
+                    </Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowLabel}>{label}</Text>
-                    <Text style={styles.rowDate}>{format(new Date(t.date), 'MMM d')}</Text>
-                  </View>
-                  <Text
-                    style={[styles.rowAmount, t.type === 'income' && styles.rowAmountIn]}
-                    numberOfLines={1}
-                  >
-                    {formatSigned(t.type === 'income' ? t.amount : -t.amount, currency)}
-                  </Text>
-                </Pressable>
+                </SwipeRow>
               );
             })}
-            <Text style={styles.hint}>Long-press a row to delete it.</Text>
+            <Text style={styles.hint}>Swipe a row left to delete it.</Text>
           </ScrollView>
         )}
       </Sheet>
