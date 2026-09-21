@@ -77,9 +77,15 @@ export default function OverviewScreen() {
   );
 
   const worstGap = useMemo(() => {
-    const days = eachDayOfInterval({ start: rangeStart, end: subDays(rangeEnd, 1) });
+    // Days that haven't happened yet are trivially 24h unlogged, which would peg
+    // this at "24h" for every week and month. Only scan up to today.
+    const lastDay = subDays(rangeEnd, 1);
+    const cutoff = startOfDay(now);
+    const scanEnd = lastDay > cutoff ? cutoff : lastDay;
+    if (scanEnd < rangeStart) return 0;
+    const days = eachDayOfInterval({ start: rangeStart, end: scanEnd });
     return days.reduce((max, d) => Math.max(max, longestGapMinutes(blocks, d)), 0);
-  }, [blocks, rangeStart, rangeEnd]);
+  }, [blocks, rangeStart, rangeEnd, now]);
 
   const breakdown = useMemo(() => {
     const totals = minutesByCategory(blocks, rangeStart, rangeEnd);

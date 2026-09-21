@@ -21,7 +21,8 @@ export default function GoalsScreen() {
 
   const next = active[0];
   // The hero already carries the nearest deadline — the list shows what's behind it.
-  const upcoming = active.slice(1, 4);
+  // All of them: capping the slice hid later goals with no way to reach them.
+  const upcoming = active.slice(1);
 
   function toggle(id: number, complete: boolean) {
     Haptics.notificationAsync(
@@ -79,7 +80,7 @@ export default function GoalsScreen() {
         </View>
 
         {upcoming.length > 0 ? (
-          <View style={styles.list}>
+          <ScrollView style={styles.list} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
             {upcoming.map((g) => {
               const days = daysUntil(g.deadline, now);
               const soon = urgencyOf(days) !== 'later';
@@ -96,7 +97,7 @@ export default function GoalsScreen() {
                 </View>
               );
             })}
-          </View>
+          </ScrollView>
         ) : null}
 
         <View style={styles.disclosure}>
@@ -176,7 +177,8 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: 6, borderRadius: 3, backgroundColor: colors.surface },
 
-  list: { marginTop: 16, gap: 8 },
+  list: { marginTop: 16, maxHeight: 222 },
+  listContent: { gap: 8 },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

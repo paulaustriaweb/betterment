@@ -78,9 +78,9 @@ export default function LogScreen() {
     setDurMin(nextDur);
   }
 
-  function resetForm() {
+  function resetForm(nextStart: number = defaultStart) {
     setEditingId(null);
-    setStartMin(defaultStart);
+    setStartMin(Math.min(MINUTES_PER_DAY - STEP, Math.max(0, nextStart)));
     setDurMin(60);
     setCategoryId(null);
     setNote('');
@@ -99,9 +99,15 @@ export default function LogScreen() {
       note: note.trim() || null,
     };
     try {
-      if (editingId) update(editingId, input);
-      else add(input);
-      resetForm();
+      if (editingId) {
+        update(editingId, input);
+        resetForm();
+      } else {
+        add(input);
+        // Chain to the end of the block just saved. defaultStart is memoised on
+        // lastBlock and still holds its pre-save value during this handler.
+        resetForm(startMin + durMin);
+      }
     } catch {
       Alert.alert("Couldn't save", 'Try again.');
     }

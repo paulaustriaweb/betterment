@@ -31,7 +31,8 @@ export function Sparkline({ values, label }: Props) {
   });
 
   const last = points[points.length - 1];
-  const pillWidth = 58;
+  // Sized to the text — "₱18,420" overflows a fixed 58px pill.
+  const pillWidth = Math.min(WIDTH - PAD_X * 2, Math.max(44, label.length * 7.2 + 18));
   const pillX = Math.min(WIDTH - pillWidth - PAD_X, Math.max(PAD_X, last.x - pillWidth / 2));
 
   return (
