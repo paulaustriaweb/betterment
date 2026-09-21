@@ -52,6 +52,13 @@ export function insertTransaction(input: TransactionInput): number {
   return result.lastInsertRowId;
 }
 
+export function updateTransaction(id: number, input: TransactionInput): void {
+  getDb().runSync(
+    'UPDATE transactions SET type = ?, amount = ?, category = ?, source = ?, note = ?, date = ? WHERE id = ?',
+    [input.type, input.amount, input.category, input.source, input.note, input.date, id]
+  );
+}
+
 export function deleteTransaction(id: number): void {
   getDb().runSync('DELETE FROM transactions WHERE id = ?', [id]);
 }

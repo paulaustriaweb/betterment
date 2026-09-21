@@ -12,7 +12,7 @@ interface Props {
 
 export function BlockRow({ block, category, onPress }: Props) {
   return (
-    <Pressable style={styles.row} onPress={onPress}>
+    <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]} onPress={onPress}>
       <View style={[styles.dot, { backgroundColor: category?.color ?? colors.inkFaint }]} />
       <Text style={styles.label} numberOfLines={1}>
         {category?.name ?? 'Unknown'}
@@ -33,6 +33,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     backgroundColor: colors.surface,
   },
+  rowPressed: { opacity: 0.55 },
   dot: { width: 9, height: 9, borderRadius: 5 },
   label: { flex: 1, fontFamily: font.medium, fontSize: 13, color: colors.ink },
   time: { fontFamily: font.regular, fontSize: 12, color: colors.inkSoft, fontVariant: ['tabular-nums'] },

@@ -22,6 +22,7 @@ import { moneyColor } from '@/constants/money';
 import { useSetting } from '@/hooks/useSettings';
 import { useTransactionsForRange } from '@/hooks/useTransactions';
 import { colors, font, spacing, type } from '@/lib/colors';
+import type { Transaction } from '@/lib/types';
 import { formatCurrency, formatSigned } from '@/lib/currency';
 import { cumulative, netOf, sumByType, transactionLabel, withinRange } from '@/lib/money';
 
@@ -36,6 +37,7 @@ export default function MoneyScreen() {
   const [range, setRange] = useState('month');
   const [listOpen, setListOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [tab, setTab] = useState<'expense' | 'income'>('expense');
   const [currency] = useSetting('currency', 'PHP');
 
@@ -52,7 +54,7 @@ export default function MoneyScreen() {
     return { rangeStart: s, rangeEnd: addMonths(s, 1) };
   }, [range, now]);
 
-  const { transactions, add, remove } = useTransactionsForRange(rangeStart, rangeEnd);
+  const { transactions, add, update, remove } = useTransactionsForRange(rangeStart, rangeEnd);
 
   const spent = sumByType(transactions, 'expense');
   const earned = sumByType(transactions, 'income');
@@ -134,7 +136,10 @@ export default function MoneyScreen() {
         <View style={styles.action}>
           <PrimaryButton
             label="Add transaction"
-            onPress={() => setAddOpen(true)}
+            onPress={() => {
+              setEditingTx(null);
+              setAddOpen(true);
+            }}
             icon={<PlusIcon color={colors.surface} />}
           />
         </View>
@@ -166,7 +171,14 @@ export default function MoneyScreen() {
               const label = transactionLabel(t);
               return (
                 <SwipeRow key={t.id} onDelete={() => remove(t.id)}>
-                  <View style={styles.row}>
+                  <Pressable
+                    style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+                    onPress={() => {
+                      setEditingTx(t);
+                      setListOpen(false);
+                      setAddOpen(true);
+                    }}
+                  >
                     <View style={[styles.rowChip, { backgroundColor: `${moneyColor(label)}22` }]}>
                       <View style={[styles.dot, { backgroundColor: moneyColor(label) }]} />
                     </View>
@@ -180,11 +192,11 @@ export default function MoneyScreen() {
                     >
                       {formatSigned(t.type === 'income' ? t.amount : -t.amount, currency)}
                     </Text>
-                  </View>
+                  </Pressable>
                 </SwipeRow>
               );
             })}
-            <Text style={styles.hint}>Swipe left to delete</Text>
+            <Text style={styles.hint}>Tap to edit · swipe left to delete</Text>
           </ScrollView>
         )}
       </Sheet>
@@ -192,8 +204,9 @@ export default function MoneyScreen() {
       <AddTransactionSheet
         visible={addOpen}
         currency={currency}
+        editing={editingTx}
         onClose={() => setAddOpen(false)}
-        onSave={(input) => add(input)}
+        onSubmit={(input, id) => (id ? update(id, input) : add(input))}
       />
     </View>
   );
@@ -244,6 +257,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 11 },
   rowChip: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   dot: { width: 9, height: 9, borderRadius: 5 },
+  rowPressed: { opacity: 0.55 },
   rowLabel: { fontFamily: font.semibold, fontSize: 13, color: colors.ink },
   rowDate: { fontFamily: font.regular, fontSize: 11, color: colors.inkSoft, marginTop: 1 },
   rowAmount: { fontFamily: font.bold, fontSize: 13.5, color: colors.ink, fontVariant: ['tabular-nums'] },

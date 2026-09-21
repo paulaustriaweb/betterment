@@ -131,7 +131,7 @@ export default function GoalsScreen() {
           <ScrollView style={styles.doneScroll}>
             {completed.map((g) => (
               <SwipeRow key={g.id} onDelete={() => remove(g.id)}>
-                <Pressable style={styles.doneRow} onPress={() => toggle(g.id, false)}>
+                <Pressable style={({ pressed }) => [styles.doneRow, pressed && styles.rowPressed]} onPress={() => toggle(g.id, false)}>
                   <View style={styles.doneCheck}>
                     <CheckIcon color={colors.surface} size={13} strokeWidth={3} />
                   </View>
@@ -204,6 +204,7 @@ const styles = StyleSheet.create({
 
   doneScroll: { marginTop: 14, maxHeight: 320 },
   doneRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 },
+  rowPressed: { opacity: 0.55 },
   doneCheck: {
     width: 24,
     height: 24,

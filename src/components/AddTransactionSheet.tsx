@@ -6,20 +6,41 @@ import { EXPENSE_CATEGORIES, INCOME_SOURCES } from '@/constants/money';
 import type { TransactionInput } from '@/db/transactions';
 import { colors, font, radius } from '@/lib/colors';
 import { formatCurrency } from '@/lib/currency';
+import { transactionLabel } from '@/lib/money';
+import type { Transaction } from '@/lib/types';
 import { AmountPad } from './AmountPad';
 import { PrimaryButton, Sheet } from './ui';
 
 interface Props {
   visible: boolean;
   currency: string;
+  /** Set to edit an existing row; null adds a new one. */
+  editing: Transaction | null;
   onClose: () => void;
-  onSave: (input: TransactionInput) => void;
+  onSubmit: (input: TransactionInput, id?: number) => void;
 }
 
-export function AddTransactionSheet({ visible, currency, onClose, onSave }: Props) {
+export function AddTransactionSheet({ visible, currency, editing, onClose, onSubmit }: Props) {
   const [type, setType] = useState<'expense' | 'income'>('expense');
   const [amount, setAmount] = useState('0');
   const [label, setLabel] = useState<string | null>(null);
+
+  // The sheet stays mounted, so load the row being edited during render rather
+  // than syncing in an effect.
+  const editingId = editing?.id ?? null;
+  const [loadedId, setLoadedId] = useState<number | null>(null);
+  if (editingId !== loadedId) {
+    setLoadedId(editingId);
+    if (editing) {
+      setType(editing.type);
+      setAmount(String(editing.amount));
+      setLabel(transactionLabel(editing));
+    } else {
+      setType('expense');
+      setAmount('0');
+      setLabel(null);
+    }
+  }
 
   const options = type === 'expense' ? EXPENSE_CATEGORIES : INCOME_SOURCES;
   const parsed = Number(amount) || 0;
@@ -31,30 +52,26 @@ export function AddTransactionSheet({ visible, currency, onClose, onSave }: Prop
     setLabel(null);
   }
 
-  function reset() {
-    setAmount('0');
-    setLabel(null);
-    setType('expense');
-  }
-
   function save() {
     if (!canSave) return;
-    onSave({
-      type,
-      amount: parsed,
-      category: type === 'expense' ? label : null,
-      source: type === 'income' ? label : null,
-      note: null,
-      date: new Date().toISOString(),
-    });
-    reset();
+    onSubmit(
+      {
+        type,
+        amount: parsed,
+        category: type === 'expense' ? label : null,
+        source: type === 'income' ? label : null,
+        note: editing?.note ?? null,
+        date: editing?.date ?? new Date().toISOString(),
+      },
+      editing?.id
+    );
     onClose();
   }
 
   return (
     <Sheet
       visible={visible}
-      title="Add transaction"
+      title={editing ? 'Edit transaction' : 'Add transaction'}
       subtitle={type === 'expense' ? 'Money out' : 'Money in'}
       onClose={onClose}
     >

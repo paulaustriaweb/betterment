@@ -4,6 +4,7 @@ import {
   deleteTransaction,
   insertTransaction,
   listTransactionsForRange,
+  updateTransaction,
   type TransactionInput,
 } from '@/db/transactions';
 import { useDbVersion } from './DbVersionContext';
@@ -25,6 +26,14 @@ export function useTransactionsForRange(rangeStart: Date, rangeEnd: Date) {
     [bump]
   );
 
+  const update = useCallback(
+    (id: number, input: TransactionInput) => {
+      updateTransaction(id, input);
+      bump();
+    },
+    [bump]
+  );
+
   const remove = useCallback(
     (id: number) => {
       deleteTransaction(id);
@@ -33,5 +42,5 @@ export function useTransactionsForRange(rangeStart: Date, rangeEnd: Date) {
     [bump]
   );
 
-  return { transactions, add, remove };
+  return { transactions, add, update, remove };
 }
