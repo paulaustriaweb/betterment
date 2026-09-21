@@ -387,6 +387,14 @@ Tests cover `lib/` only — the date arithmetic, gap detection, money sums, goal
 currency validation. There are no component tests; the UI was checked by using it.
 
 ### Conventions a new session must not undo
+- **`patches/expo-sqlite+57.0.3.patch` is load-bearing. Do not delete it, and keep the
+  `postinstall: patch-package` script.** expo-sqlite 57's web worker writes the length
+  header of a sync result with `Uint8Array.set(new Uint32Array([length]))`, which converts
+  element-wise and writes a *single byte* — so every sync result of 256 bytes or more came
+  back truncated to `length % 256` and blew up as `JSON Parse error`. Reads are row-at-a-time,
+  which is why it only surfaced once a single row grew past 256 bytes. The patch writes and
+  reads the header with a `DataView`. Re-check this on any expo-sqlite upgrade; if upstream
+  has fixed it, drop the patch rather than carrying it forward.
 - **Spans are merged before summing** in `lib/time.ts`. Overlapping blocks are allowed by
   design, so naive summing double-counts minutes and can report negative unaccounted time.
 - **Two React Compiler lint rules bite repeatedly.** `react-hooks/set-state-in-effect`:

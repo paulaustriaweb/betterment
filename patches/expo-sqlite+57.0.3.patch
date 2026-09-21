@@ -1,0 +1,25 @@
+diff --git a/node_modules/expo-sqlite/web/WorkerChannel.ts b/node_modules/expo-sqlite/web/WorkerChannel.ts
+index 7fba380..0396e1c 100644
+--- a/node_modules/expo-sqlite/web/WorkerChannel.ts
++++ b/node_modules/expo-sqlite/web/WorkerChannel.ts
+@@ -40,7 +40,10 @@ export function sendWorkerResult({
+     const resultJson = error != null ? serialize({ error }) : serialize({ result });
+     const resultBytes = new TextEncoder().encode(resultJson);
+     const length = resultBytes.length;
+-    resultArray.set(new Uint32Array([length]), 0);
++    // Uint8Array.set() with a Uint32Array source converts element-wise, writing a
++    // single byte — so the length header was truncated to length % 256 and every
++    // sync result of 256 bytes or more came back as malformed JSON.
++    new DataView(resultBuffer).setUint32(0, length, true);
+     resultArray.set(resultBytes, 4);
+     Atomics.store(lock, 0, RESOLVED);
+   } else {
+@@ -137,7 +140,7 @@ export function invokeWorkerSync<T extends SQLiteWorkerMessageType & keyof Resul
+     }
+   }
+ 
+-  const length = new Uint32Array(resultArray.buffer, 0, 1)[0];
++  const length = new DataView(resultArray.buffer).getUint32(0, true);
+   const resultCopy = new Uint8Array(length);
+   resultCopy.set(new Uint8Array(resultArray.buffer, 4, length));
+   const resultJson = new TextDecoder().decode(resultCopy);
