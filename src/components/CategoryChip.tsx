@@ -14,6 +14,9 @@ export function CategoryChip({ category, selected, onSelect }: Props) {
   return (
     <Pressable
       style={[styles.chip, { backgroundColor: selected ? colors.ink : colors.surface }]}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={category.name}
       onPress={() => {
         Haptics.selectionAsync();
         onSelect(category.id);

@@ -87,7 +87,14 @@ export default function GoalsScreen() {
               const soon = urgencyOf(days) !== 'later';
               return (
                 <View key={g.id} style={styles.card}>
-                  <Pressable style={styles.checkbox} onPress={() => toggle(g.id, true)} hitSlop={8} />
+                  <Pressable
+                    style={styles.checkbox}
+                    onPress={() => toggle(g.id, true)}
+                    hitSlop={8}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: false }}
+                    accessibilityLabel={`Mark "${g.title}" done`}
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitle}>{g.title}</Text>
                     <Text style={styles.cardDate}>{format(new Date(g.deadline), 'MMM d')}</Text>
@@ -131,7 +138,13 @@ export default function GoalsScreen() {
           <ScrollView style={styles.doneScroll}>
             {completed.map((g) => (
               <SwipeRow key={g.id} onDelete={() => remove(g.id)}>
-                <Pressable style={({ pressed }) => [styles.doneRow, pressed && styles.rowPressed]} onPress={() => toggle(g.id, false)}>
+                <Pressable
+                  style={({ pressed }) => [styles.doneRow, pressed && styles.rowPressed]}
+                  onPress={() => toggle(g.id, false)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: true }}
+                  accessibilityLabel={`"${g.title}" is done. Tap to bring it back.`}
+                >
                   <View style={styles.doneCheck}>
                     <CheckIcon color={colors.surface} size={13} strokeWidth={3} />
                   </View>

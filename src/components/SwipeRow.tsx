@@ -58,7 +58,7 @@ export function SwipeRow({ children, onDelete }: Props) {
 
   return (
     <View style={styles.wrap}>
-      <Pressable style={styles.action} onPress={confirmDelete} accessibilityLabel="Delete">
+      <Pressable style={styles.action} onPress={confirmDelete} accessibilityRole="button" accessibilityLabel="Delete">
         <TrashIcon color={colors.surface} />
         <Text style={styles.actionLabel}>Delete</Text>
       </Pressable>

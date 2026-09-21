@@ -154,6 +154,9 @@ export default function MoneyScreen() {
                 key={t}
                 style={[styles.segmentItem, active && styles.segmentItemActive]}
                 onPress={() => setTab(t)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={t === 'expense' ? 'Expenses' : 'Income'}
               >
                 <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>
                   {t === 'expense' ? 'Expenses' : 'Income'}
