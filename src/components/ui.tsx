@@ -60,6 +60,8 @@ export function RangePills({
           <Pressable
             key={o.key}
             onPress={() => onChange(o.key)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
             style={[styles.pill, { backgroundColor: active ? colors.rose : colors.surface }]}
           >
             <Text style={[styles.pillLabel, { color: active ? colors.surface : colors.inkSoft }]}>{o.label}</Text>
@@ -76,7 +78,8 @@ export function StatCard({ label, value, tone }: { label: string; value: string;
   const fg = tone === 'ink' ? colors.surface : colors.ink;
   const labelColor = tone === 'ink' ? 'rgba(255,255,255,0.80)' : colors.ink;
   return (
-    <View style={[styles.statCard, { backgroundColor: bg }]}>
+    // `accessible` collapses the label and the figure into one announcement.
+    <View style={[styles.statCard, { backgroundColor: bg }]} accessible accessibilityLabel={`${label}: ${value}`}>
       <Text style={[styles.statLabel, { color: labelColor }]}>{label}</Text>
       {/* Shrink rather than wrap — a figure broken across two lines is unreadable. */}
       <Text style={[styles.statValue, { color: fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
@@ -101,7 +104,12 @@ export function DisclosureRow({
   onPress: () => void;
 }) {
   return (
-    <Pressable style={styles.disclosure} onPress={onPress}>
+    <Pressable
+      style={styles.disclosure}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={hint ? `${title}. ${hint}` : title}
+    >
       <View style={styles.iconChip}>{icon}</View>
       <View style={{ flex: 1 }}>
         <Text style={styles.disclosureTitle}>{title}</Text>
@@ -113,7 +121,18 @@ export function DisclosureRow({
   );
 }
 
-export function Stepper({ direction, onPress, tone = 'tint' }: { direction: 'up' | 'down'; onPress: () => void; tone?: 'tint' | 'onRose' | 'solid' }) {
+export function Stepper({
+  direction,
+  onPress,
+  label,
+  tone = 'tint',
+}: {
+  direction: 'up' | 'down';
+  onPress: () => void;
+  /** What this steps — a plus sign on its own tells a screen reader nothing. */
+  label: string;
+  tone?: 'tint' | 'onRose' | 'solid';
+}) {
   const bg = tone === 'tint' ? colors.roseTint : tone === 'solid' ? colors.surface : 'rgba(255,255,255,0.22)';
   const fg = tone === 'onRose' ? colors.surface : colors.rose;
   const size = tone === 'tint' ? 36 : 44;
@@ -121,6 +140,8 @@ export function Stepper({ direction, onPress, tone = 'tint' }: { direction: 'up'
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={[styles.stepper, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg }]}
     >
       <Icon color={fg} size={tone === 'tint' ? 15 : 18} />
@@ -130,7 +151,7 @@ export function Stepper({ direction, onPress, tone = 'tint' }: { direction: 'up'
 
 export function PrimaryButton({ label, onPress, icon }: { label: string; onPress: () => void; icon?: ReactNode }) {
   return (
-    <Pressable style={styles.primaryButton} onPress={onPress}>
+    <Pressable style={styles.primaryButton} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
       {icon}
       <Text style={styles.primaryLabel}>{label}</Text>
     </Pressable>
@@ -153,7 +174,7 @@ export function Sheet({
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
       <KeyboardAvoidingView
         style={styles.sheetWrap}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -165,7 +186,12 @@ export function Sheet({
               <Text style={styles.sheetTitle}>{title}</Text>
               {subtitle ? <Text style={styles.sheetSubtitle}>{subtitle}</Text> : null}
             </View>
-            <Pressable style={styles.sheetClose} onPress={onClose}>
+            <Pressable
+              style={styles.sheetClose}
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel={`Close ${title}`}
+            >
               <CloseIcon color={colors.inkSoft} />
             </Pressable>
           </View>

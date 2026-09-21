@@ -8,6 +8,7 @@ import {
   cancelNightlyReminder,
   formatReminderTime,
   parseReminderTime,
+  remindersSupported,
   scheduleNightlyReminder,
 } from '@/lib/notifications';
 import { Sheet, Stepper } from './ui';
@@ -20,7 +21,7 @@ export function ReminderSheet({ visible, onClose }: { visible: boolean; onClose:
   const [denied, setDenied] = useState(false);
 
   const { hour, minute } = parseReminderTime(time);
-  const on = enabled === '1';
+  const on = enabled === '1' && remindersSupported;
 
   async function apply(nextOn: boolean, h: number, m: number) {
     if (!nextOn) {
@@ -51,13 +52,17 @@ export function ReminderSheet({ visible, onClose }: { visible: boolean; onClose:
       <View style={styles.toggleRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.toggleTitle}>Remind me each night</Text>
-          <Text style={styles.toggleHint}>{on ? 'On' : 'Off'}</Text>
+          <Text style={styles.toggleHint}>
+            {remindersSupported ? (on ? 'On' : 'Off') : 'Unavailable here'}
+          </Text>
         </View>
         <Switch
           value={on}
           onValueChange={toggle}
+          disabled={!remindersSupported}
           trackColor={{ true: colors.rose, false: '#E4CBD4' }}
           thumbColor={colors.surface}
+          accessibilityLabel="Remind me each night"
         />
       </View>
 
@@ -69,14 +74,19 @@ export function ReminderSheet({ visible, onClose }: { visible: boolean; onClose:
           </Text>
         </View>
         <View style={styles.steppers}>
-          <Stepper direction="down" onPress={() => shift(-STEP)} />
-          <Stepper direction="up" onPress={() => shift(STEP)} />
+          <Stepper direction="down" label="15 minutes earlier" onPress={() => shift(-STEP)} />
+          <Stepper direction="up" label="15 minutes later" onPress={() => shift(STEP)} />
         </View>
       </View>
 
-      {denied ? (
+      {!remindersSupported ? (
+        <Text style={styles.note}>
+          A home-screen web app gets no scheduled notifications on iOS, so this can&apos;t fire here. Seeing the
+          empty hours on Your day is what actually gets you logging anyway.
+        </Text>
+      ) : denied ? (
         <Text style={styles.denied}>
-          iOS denied notification permission. Turn it on in Settings › Notifications › Expo Go.
+          iOS denied notification permission. Turn it on in Settings › Notifications.
         </Text>
       ) : (
         <Text style={styles.note}>

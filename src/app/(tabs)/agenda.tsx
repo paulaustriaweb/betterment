@@ -1,4 +1,4 @@
-import { addDays, differenceInMinutes, format, isSameDay, startOfDay, startOfWeek } from 'date-fns';
+import { addDays, addMinutes, differenceInMinutes, format, isSameDay, startOfDay, startOfWeek } from 'date-fns';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -27,6 +27,8 @@ export default function AgendaScreen() {
 
   const isToday = isSameDay(selected, now);
   const nowMinutes = differenceInMinutes(now, startOfDay(now));
+  // Log writes to whatever day this names — without it, logging a past day lands on today.
+  const dayParam = format(selected, 'yyyy-MM-dd');
 
   const week = useMemo(() => {
     const start = startOfWeek(selected);
@@ -50,7 +52,14 @@ export default function AgendaScreen() {
           {week.map((d) => {
             const active = isSameDay(d, selected);
             return (
-              <Pressable key={d.toISOString()} style={styles.weekDay} onPress={() => setSelected(startOfDay(d))}>
+              <Pressable
+                key={d.toISOString()}
+                style={styles.weekDay}
+                onPress={() => setSelected(startOfDay(d))}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={format(d, 'EEEE, MMMM d')}
+              >
                 <Text style={styles.weekDow}>{format(d, 'EEEEE')}</Text>
                 <View style={[styles.weekNum, active && styles.weekNumActive]}>
                   <Text style={[styles.weekNumText, active && styles.weekNumTextActive]}>{format(d, 'd')}</Text>
@@ -81,10 +90,15 @@ export default function AgendaScreen() {
             <Pressable
               key={`gap-${gap.start}`}
               style={[styles.gap, { top: (gap.start / 60) * HOUR_HEIGHT, height: Math.max(30, height - 4) }]}
+              accessibilityRole="button"
+              accessibilityLabel={`${formatDuration(minutes)} not logged from ${format(
+                addMinutes(selected, gap.start),
+                'h:mm a'
+              )}. Tap to log it.`}
               onPress={() =>
                 router.push({
                   pathname: '/log',
-                  params: { start: String(gap.start), dur: String(Math.min(minutes, 240)) },
+                  params: { date: dayParam, start: String(gap.start), dur: String(Math.min(minutes, 240)) },
                 })
               }
             >
@@ -107,7 +121,12 @@ export default function AgendaScreen() {
                 styles.block,
                 { top: (start / 60) * HOUR_HEIGHT, height: Math.max(28, height - 4), backgroundColor: tint.fill },
               ]}
-              onPress={() => router.push('/log')}
+              accessibilityRole="button"
+              accessibilityLabel={`${category?.name ?? 'Entry'}, ${format(
+                new Date(b.startTime),
+                'h:mm a'
+              )} to ${format(new Date(b.endTime), 'h:mm a')}. Tap to edit.`}
+              onPress={() => router.push({ pathname: '/log', params: { date: dayParam, edit: String(b.id) } })}
             >
               <Text style={[styles.blockTitle, { color: tint.text }]} numberOfLines={1}>
                 {category?.name ?? 'Unknown'}

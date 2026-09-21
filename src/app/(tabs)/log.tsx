@@ -1,4 +1,4 @@
-import { addMinutes, differenceInMinutes, format, isSameDay, startOfDay } from 'date-fns';
+import { addMinutes, differenceInMinutes, format, isSameDay, parseISO, startOfDay } from 'date-fns';
 import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -14,24 +14,43 @@ import type { TimeBlockInput } from '@/db/timeBlocks';
 import { useCategories } from '@/hooks/useCategories';
 import { useLastTimeBlock, useTimeBlocksForDay } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, type } from '@/lib/colors';
+import type { TimeBlock } from '@/lib/types';
 import { detectOverlap, formatDuration } from '@/lib/time';
 
 const STEP = 15;
 const MINUTES_PER_DAY = 24 * 60;
 const PRESETS = [15, 30, 60, 120, 180];
 
+function clampStart(minutes: number): number {
+  return Math.min(MINUTES_PER_DAY - STEP, Math.max(0, minutes));
+}
+
+/** Where the previous entry left off, if it was on this day. */
+function lastBlockEndOnDay(lastBlock: TimeBlock | null, day: Date): number | null {
+  if (!lastBlock) return null;
+  const end = new Date(lastBlock.endTime);
+  return isSameDay(end, day) ? differenceInMinutes(end, day) : null;
+}
+
 export default function LogScreen() {
-  const today = useMemo(() => new Date(), []);
-  const dayStart = useMemo(() => startOfDay(today), [today]);
+  const now = useMemo(() => new Date(), []);
   const categories = useCategories();
   const lastBlock = useLastTimeBlock();
-  const { blocks, add, update, remove } = useTimeBlocksForDay(today);
+
+  // Every time on this screen is an offset from `day`, so this is what decides
+  // which date an entry lands on. It is not always today — Your day can hand over
+  // a past date, and writing that to today would silently corrupt both days.
+  const [day, setDay] = useState(() => startOfDay(now));
+  const { blocks, add, update, remove } = useTimeBlocksForDay(day);
+  const isToday = isSameDay(day, now);
 
   const defaultStart = useMemo(() => {
-    if (!lastBlock) return differenceInMinutes(today, dayStart);
-    const lastEnd = new Date(lastBlock.endTime);
-    return isSameDay(lastEnd, today) ? differenceInMinutes(lastEnd, dayStart) : differenceInMinutes(today, dayStart);
-  }, [lastBlock, today, dayStart]);
+    const minutes = isToday
+      ? lastBlockEndOnDay(lastBlock, day) ?? differenceInMinutes(now, day)
+      : // Filling a past day in after the fact: carry on from its last entry.
+        blocks.reduce((max, b) => Math.max(max, differenceInMinutes(new Date(b.endTime), day)), 0);
+    return clampStart(minutes);
+  }, [isToday, lastBlock, blocks, now, day]);
 
   const [startMin, setStartMin] = useState(defaultStart);
   const [durMin, setDurMin] = useState(60);
@@ -40,21 +59,31 @@ export default function LogScreen() {
   const [noteOpen, setNoteOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [pendingEdit, setPendingEdit] = useState<number | null>(null);
 
-  // Arriving from a tapped gap on Agenda: prefill that stretch. Log is a tab, so
-  // it never remounts — adjust during render when the params change rather than
-  // syncing in an effect.
-  const params = useLocalSearchParams<{ start?: string; dur?: string }>();
-  const paramSignature = `${params.start ?? ''}|${params.dur ?? ''}`;
+  // Arriving from Your day: `date` says which day to write to, a tapped gap prefills
+  // that stretch, and a tapped entry opens it for editing. Log is a tab, so it never
+  // remounts — adjust during render when the params change rather than syncing in an
+  // effect.
+  const params = useLocalSearchParams<{ date?: string; start?: string; dur?: string; edit?: string }>();
+  const paramSignature = `${params.date ?? ''}|${params.start ?? ''}|${params.dur ?? ''}|${params.edit ?? ''}`;
   const [appliedSignature, setAppliedSignature] = useState(paramSignature);
   if (paramSignature !== appliedSignature) {
     setAppliedSignature(paramSignature);
-    if (params.start !== undefined) setStartMin(Number(params.start));
+    setDay(params.date ? startOfDay(parseISO(params.date)) : startOfDay(now));
+    setEditingId(null);
+    if (params.start !== undefined) setStartMin(clampStart(Number(params.start)));
     if (params.dur !== undefined) setDurMin(Number(params.dur));
+    setPendingEdit(params.edit !== undefined ? Number(params.edit) : null);
+  } else if (pendingEdit !== null) {
+    // Runs on the following render, once `blocks` has been re-read for the new day.
+    const block = blocks.find((b) => b.id === pendingEdit);
+    setPendingEdit(null);
+    if (block) startEditing(block);
   }
 
-  const startDate = addMinutes(dayStart, startMin);
-  const endDate = addMinutes(dayStart, startMin + durMin);
+  const startDate = addMinutes(day, startMin);
+  const endDate = addMinutes(day, startMin + durMin);
 
   const overlap = useMemo(
     () => detectOverlap(blocks, startDate, endDate, editingId ?? undefined),
@@ -67,11 +96,11 @@ export default function LogScreen() {
       blocks
         .filter((b) => b.id !== editingId)
         .map((b) => ({
-          start: differenceInMinutes(new Date(b.startTime), dayStart),
-          end: differenceInMinutes(new Date(b.endTime), dayStart),
+          start: differenceInMinutes(new Date(b.startTime), day),
+          end: differenceInMinutes(new Date(b.endTime), day),
           color: categories.find((c) => c.id === b.categoryId)?.color ?? colors.inkFaint,
         })),
-    [blocks, categories, dayStart, editingId]
+    [blocks, categories, day, editingId]
   );
 
   function setRange(nextStart: number, nextDur: number) {
@@ -81,11 +110,18 @@ export default function LogScreen() {
 
   function resetForm(nextStart: number = defaultStart) {
     setEditingId(null);
-    setStartMin(Math.min(MINUTES_PER_DAY - STEP, Math.max(0, nextStart)));
+    setStartMin(clampStart(nextStart));
     setDurMin(60);
     setCategoryId(null);
     setNote('');
     setNoteOpen(false);
+  }
+
+  function goToToday() {
+    const todayStart = startOfDay(now);
+    setDay(todayStart);
+    // defaultStart is still memoised on the old day, so pass the start explicitly.
+    resetForm(differenceInMinutes(now, todayStart));
   }
 
   function handleSave() {
@@ -114,13 +150,11 @@ export default function LogScreen() {
     }
   }
 
-  function handleEdit(id: number) {
-    const block = blocks.find((b) => b.id === id);
-    if (!block) return;
+  function startEditing(block: TimeBlock) {
     const s = new Date(block.startTime);
     const e = new Date(block.endTime);
-    setEditingId(id);
-    setStartMin(differenceInMinutes(s, dayStart));
+    setEditingId(block.id);
+    setStartMin(clampStart(differenceInMinutes(s, day)));
     setDurMin(Math.max(STEP, differenceInMinutes(e, s)));
     setCategoryId(block.categoryId);
     setNote(block.note ?? '');
@@ -140,7 +174,24 @@ export default function LogScreen() {
   return (
     <View style={styles.screen}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <ScreenHeader title="Add time" subtitle={editingId ? 'Editing an entry' : 'New entry'} />
+        <ScreenHeader
+          title="Add time"
+          subtitle={`${editingId ? 'Editing an entry' : 'New entry'} · ${
+            isToday ? 'today' : format(day, 'EEE, MMM d')
+          }`}
+          right={
+            isToday ? undefined : (
+              <Pressable
+                style={styles.todayPill}
+                onPress={goToToday}
+                accessibilityRole="button"
+                accessibilityLabel="Back to today"
+              >
+                <Text style={styles.todayLabel}>Today</Text>
+              </Pressable>
+            )
+          }
+        />
 
         <View style={styles.heroCard}>
           <View style={styles.heroTop}>
@@ -151,10 +202,16 @@ export default function LogScreen() {
               </Text>
             </View>
             <View style={styles.stepperPair}>
-              <Stepper direction="down" tone="onRose" onPress={() => setDurMin(Math.max(STEP, durMin - STEP))} />
+              <Stepper
+                direction="down"
+                tone="onRose"
+                label="15 minutes shorter"
+                onPress={() => setDurMin(Math.max(STEP, durMin - STEP))}
+              />
               <Stepper
                 direction="up"
                 tone="solid"
+                label="15 minutes longer"
                 onPress={() => setDurMin(Math.min(720, durMin + STEP))}
               />
             </View>
@@ -167,6 +224,9 @@ export default function LogScreen() {
                 <Pressable
                   key={p}
                   style={[styles.preset, active && styles.presetActive]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={formatDuration(p)}
                   onPress={() => setDurMin(Math.min(p, MINUTES_PER_DAY - startMin))}
                 >
                   <Text style={[styles.presetLabel, active && styles.presetLabelActive]}>{formatDuration(p)}</Text>
@@ -186,12 +246,16 @@ export default function LogScreen() {
               <Text style={styles.fieldLabel}>Ends</Text>
               <Text style={styles.fieldValue}>{format(endDate, 'h:mm a')}</Text>
             </View>
-            <Pressable
-              style={styles.endNow}
-              onPress={() => setDurMin(Math.max(STEP, differenceInMinutes(new Date(), startDate)))}
-            >
-              <Text style={styles.endNowLabel}>End now</Text>
-            </Pressable>
+            {isToday ? (
+              <Pressable
+                style={styles.endNow}
+                onPress={() => setDurMin(Math.max(STEP, differenceInMinutes(new Date(), startDate)))}
+                accessibilityRole="button"
+                accessibilityLabel="End this entry at the current time"
+              >
+                <Text style={styles.endNowLabel}>End now</Text>
+              </Pressable>
+            ) : null}
           </View>
 
           <View style={styles.trackWrap}>
@@ -201,9 +265,14 @@ export default function LogScreen() {
           <View style={styles.nudgeRow}>
             <Text style={styles.nudgeHint}>Drag it, or nudge the start</Text>
             <View style={styles.stepperPairSmall}>
-              <Stepper direction="down" onPress={() => setStartMin(Math.max(0, startMin - STEP))} />
+              <Stepper
+                direction="down"
+                label="Start 15 minutes earlier"
+                onPress={() => setStartMin(Math.max(0, startMin - STEP))}
+              />
               <Stepper
                 direction="up"
+                label="Start 15 minutes later"
                 onPress={() => setStartMin(Math.min(MINUTES_PER_DAY - durMin, startMin + STEP))}
               />
             </View>
@@ -212,9 +281,11 @@ export default function LogScreen() {
 
         <Text style={styles.sectionLabel}>What were you doing?</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          {categories.map((c) => (
-            <CategoryChip key={c.id} category={c} selected={categoryId === c.id} onSelect={setCategoryId} />
-          ))}
+          {categories
+            .filter((c) => c.isActive || c.id === categoryId)
+            .map((c) => (
+              <CategoryChip key={c.id} category={c} selected={categoryId === c.id} onSelect={setCategoryId} />
+            ))}
         </ScrollView>
 
         <View style={styles.disclosureGroup}>
@@ -238,7 +309,7 @@ export default function LogScreen() {
 
           <DisclosureRow
             icon={<TimelineIcon color={colors.rose} />}
-            title="Today's entries"
+            title={isToday ? "Today's entries" : `Entries on ${format(day, 'MMM d')}`}
             hint={blocks.length === 0 ? 'Nothing logged yet' : `${blocks.length} so far · tap to edit`}
             onPress={() => setListOpen(true)}
           />
@@ -261,8 +332,8 @@ export default function LogScreen() {
 
       <Sheet
         visible={listOpen}
-        title="Today's entries"
-        subtitle={format(today, 'EEEE, MMM d')}
+        title={isToday ? "Today's entries" : 'Entries'}
+        subtitle={format(day, 'EEEE, MMM d')}
         onClose={() => setListOpen(false)}
       >
         {blocks.length === 0 ? (
@@ -274,7 +345,7 @@ export default function LogScreen() {
                 <BlockRow
                   block={b}
                   category={categories.find((c) => c.id === b.categoryId)}
-                  onPress={() => handleEdit(b.id)}
+                  onPress={() => startEditing(b)}
                 />
               </SwipeRow>
             ))}
@@ -290,6 +361,9 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.ground },
   scroll: { flex: 1 },
   content: { paddingTop: 26, paddingHorizontal: spacing.gutter, paddingBottom: 24 },
+
+  todayPill: { backgroundColor: colors.surface, borderRadius: 18, paddingVertical: 8, paddingHorizontal: 14 },
+  todayLabel: { fontFamily: font.semibold, fontSize: 12.5, color: colors.rose },
 
   heroCard: { backgroundColor: colors.rose, borderRadius: 26, padding: 18, marginTop: 16 },
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
