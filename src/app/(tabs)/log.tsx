@@ -12,6 +12,7 @@ import { SwipeRow } from '@/components/SwipeRow';
 import { Card, DisclosureRow, PrimaryButton, ScreenHeader, Sheet, Stepper } from '@/components/ui';
 import type { TimeBlockInput } from '@/db/timeBlocks';
 import { useCategories } from '@/hooks/useCategories';
+import { useNow } from '@/hooks/useNow';
 import { useLastTimeBlock, useTimeBlocksForDay } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, type } from '@/lib/colors';
 import type { TimeBlock } from '@/lib/types';
@@ -21,8 +22,28 @@ const STEP = 15;
 const MINUTES_PER_DAY = 24 * 60;
 const PRESETS = [15, 30, 60, 120, 180];
 
+const MAX_DURATION = 720;
+
 function clampStart(minutes: number): number {
   return Math.min(MINUTES_PER_DAY - STEP, Math.max(0, minutes));
+}
+
+function clampDuration(minutes: number): number {
+  return Math.min(MAX_DURATION, Math.max(STEP, minutes));
+}
+
+// Route params are part of the URL on the web build, so they are user input:
+// a hand-edited ?start=abc must not turn into an Invalid Date and a white screen.
+function finite(value: string | undefined): number | null {
+  if (value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseDayParam(value: string | undefined): Date | null {
+  if (value === undefined) return null;
+  const parsed = startOfDay(parseISO(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 /** Where the previous entry left off, if it was on this day. */
@@ -33,7 +54,7 @@ function lastBlockEndOnDay(lastBlock: TimeBlock | null, day: Date): number | nul
 }
 
 export default function LogScreen() {
-  const now = useMemo(() => new Date(), []);
+  const now = useNow();
   const categories = useCategories();
   const lastBlock = useLastTimeBlock();
 
@@ -65,16 +86,25 @@ export default function LogScreen() {
   // that stretch, and a tapped entry opens it for editing. Log is a tab, so it never
   // remounts — adjust during render when the params change rather than syncing in an
   // effect.
-  const params = useLocalSearchParams<{ date?: string; start?: string; dur?: string; edit?: string }>();
-  const paramSignature = `${params.date ?? ''}|${params.start ?? ''}|${params.dur ?? ''}|${params.edit ?? ''}`;
-  const [appliedSignature, setAppliedSignature] = useState(paramSignature);
+  const params = useLocalSearchParams<{ date?: string; n?: string; start?: string; dur?: string; edit?: string }>();
+  // `n` is why the nonce exists on the Day side: tapping the same gap twice sends
+  // identical values, and without it the second tap would look like no change at
+  // all — leaving the form on whatever day it had drifted to.
+  const paramSignature = [params.date, params.n, params.start, params.dur, params.edit].join('|');
+  // Starts as null rather than the current signature: tabs mount lazily, so the
+  // first tap on a gap after launch is also this screen's first render. Seeding
+  // this with the incoming params would treat them as already applied and drop
+  // them — which is the original "logs to today" bug wearing a different hat.
+  const [appliedSignature, setAppliedSignature] = useState<string | null>(null);
   if (paramSignature !== appliedSignature) {
     setAppliedSignature(paramSignature);
-    setDay(params.date ? startOfDay(parseISO(params.date)) : startOfDay(now));
+    setDay(parseDayParam(params.date) ?? startOfDay(now));
     setEditingId(null);
-    if (params.start !== undefined) setStartMin(clampStart(Number(params.start)));
-    if (params.dur !== undefined) setDurMin(Number(params.dur));
-    setPendingEdit(params.edit !== undefined ? Number(params.edit) : null);
+    const start = finite(params.start);
+    const dur = finite(params.dur);
+    if (start !== null) setStartMin(clampStart(start));
+    if (dur !== null) setDurMin(clampDuration(dur));
+    setPendingEdit(finite(params.edit));
   } else if (pendingEdit !== null) {
     // Runs on the following render, once `blocks` has been re-read for the new day.
     const block = blocks.find((b) => b.id === pendingEdit);
@@ -212,7 +242,7 @@ export default function LogScreen() {
                 direction="up"
                 tone="solid"
                 label="15 minutes longer"
-                onPress={() => setDurMin(Math.min(720, durMin + STEP))}
+                onPress={() => setDurMin(Math.min(MAX_DURATION, durMin + STEP))}
               />
             </View>
           </View>

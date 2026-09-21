@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/ui';
 import { useCategories } from '@/hooks/useCategories';
+import { useNow } from '@/hooks/useNow';
 import { useTimeBlocksForDay } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, tintFor } from '@/lib/colors';
 import { findGaps, formatDuration } from '@/lib/time';
@@ -18,7 +19,7 @@ const COMPACT_BLOCK = 44;
 export default function AgendaScreen() {
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
-  const now = useMemo(() => new Date(), []);
+  const now = useNow();
   const [selected, setSelected] = useState(() => startOfDay(now));
 
   const categories = useCategories();
@@ -36,10 +37,15 @@ export default function AgendaScreen() {
   }, [selected]);
 
   useEffect(() => {
-    // open on the current hour rather than midnight — nobody logs at 3am
-    const target = isToday ? (nowMinutes / 60) * HOUR_HEIGHT - 180 : 8 * HOUR_HEIGHT;
+    // Open on the current hour rather than midnight — nobody logs at 3am. The clock
+    // is read here rather than taken from `now`, which ticks every minute and would
+    // otherwise drag the timeline back under the reader once a minute.
+    const clock = new Date();
+    const target = isSameDay(selected, clock)
+      ? (differenceInMinutes(clock, startOfDay(clock)) / 60) * HOUR_HEIGHT - 180
+      : 8 * HOUR_HEIGHT;
     scrollRef.current?.scrollTo({ y: Math.max(0, target), animated: false });
-  }, [isToday, nowMinutes, selected]);
+  }, [selected]);
 
   const totalGapMinutes = gaps.reduce((sum, g) => sum + (g.end - g.start), 0);
 
@@ -98,7 +104,12 @@ export default function AgendaScreen() {
               onPress={() =>
                 router.push({
                   pathname: '/log',
-                  params: { date: dayParam, start: String(gap.start), dur: String(Math.min(minutes, 240)) },
+                  params: {
+                    date: dayParam,
+                    n: String(Date.now()),
+                    start: String(gap.start),
+                    dur: String(Math.min(minutes, 240)),
+                  },
                 })
               }
             >
@@ -126,7 +137,12 @@ export default function AgendaScreen() {
                 new Date(b.startTime),
                 'h:mm a'
               )} to ${format(new Date(b.endTime), 'h:mm a')}. Tap to edit.`}
-              onPress={() => router.push({ pathname: '/log', params: { date: dayParam, edit: String(b.id) } })}
+              onPress={() =>
+                router.push({
+                  pathname: '/log',
+                  params: { date: dayParam, n: String(Date.now()), edit: String(b.id) },
+                })
+              }
             >
               <Text style={[styles.blockTitle, { color: tint.text }]} numberOfLines={1}>
                 {category?.name ?? 'Unknown'}
