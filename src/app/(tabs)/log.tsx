@@ -1,13 +1,13 @@
 import { addMinutes, differenceInMinutes, format, isSameDay, parseISO, startOfDay } from 'date-fns';
 import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BlockRow } from '@/components/BlockRow';
 import { CategoryChip } from '@/components/CategoryChip';
 import { DayTrack, type TrackBlock } from '@/components/DayTrack';
 import { NoteIcon, PlusIcon, TimelineIcon } from '@/components/icons';
-import { OverlapBanner } from '@/components/OverlapBanner';
+import { Banner } from '@/components/Banner';
 import { SwipeRow } from '@/components/SwipeRow';
 import { Card, DisclosureRow, PrimaryButton, ScreenHeader, Sheet, Stepper } from '@/components/ui';
 import type { TimeBlockInput } from '@/db/timeBlocks';
@@ -81,6 +81,7 @@ export default function LogScreen() {
   const [listOpen, setListOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [pendingEdit, setPendingEdit] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   // Arriving from Your day: `date` says which day to write to, a tapped gap prefills
   // that stretch, and a tapped entry opens it for editing. Log is a tab, so it never
@@ -156,7 +157,7 @@ export default function LogScreen() {
 
   function handleSave() {
     if (!categoryId) {
-      Alert.alert('Pick a category', 'Choose what you were doing.');
+      setNotice('Pick a category first — what were you doing?');
       return;
     }
     const input: TimeBlockInput = {
@@ -175,8 +176,10 @@ export default function LogScreen() {
         // lastBlock and still holds its pre-save value during this handler.
         resetForm(startMin + durMin);
       }
-    } catch {
-      Alert.alert("Couldn't save", 'Try again.');
+      setNotice(null);
+    } catch (error) {
+      console.error('save failed', error);
+      setNotice("Couldn't save that — try again.");
     }
   }
 
@@ -196,8 +199,10 @@ export default function LogScreen() {
     try {
       remove(id);
       if (editingId === id) resetForm();
-    } catch {
-      Alert.alert("Couldn't delete", 'Try again.');
+      setNotice(null);
+    } catch (error) {
+      console.error('delete failed', error);
+      setNotice("Couldn't delete that — try again.");
     }
   }
 
@@ -314,7 +319,15 @@ export default function LogScreen() {
           {categories
             .filter((c) => c.isActive || c.id === categoryId)
             .map((c) => (
-              <CategoryChip key={c.id} category={c} selected={categoryId === c.id} onSelect={setCategoryId} />
+              <CategoryChip
+                key={c.id}
+                category={c}
+                selected={categoryId === c.id}
+                onSelect={(id) => {
+                  setCategoryId(id);
+                  setNotice(null);
+                }}
+              />
             ))}
         </ScrollView>
 
@@ -345,9 +358,13 @@ export default function LogScreen() {
           />
         </View>
 
-        {overlap ? (
+        {notice ? (
           <View style={styles.banner}>
-            <OverlapBanner message={`This overlaps ${overlapName ?? 'another entry'}. Move it, or save anyway.`} />
+            <Banner message={notice} />
+          </View>
+        ) : overlap ? (
+          <View style={styles.banner}>
+            <Banner message={`This overlaps ${overlapName ?? 'another entry'}. Move it, or save anyway.`} />
           </View>
         ) : null}
 

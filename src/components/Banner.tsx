@@ -3,11 +3,11 @@ import { StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/lib/colors';
 import { AlertIcon } from './icons';
 
-interface Props {
-  message: string;
-}
-
-export function OverlapBanner({ message }: Props) {
+/**
+ * Inline feedback, because Alert.alert is a no-op on react-native-web and the
+ * web build is what ships — an alert there is a button that does nothing.
+ */
+export function Banner({ message }: { message: string }) {
   return (
     <View style={styles.wrap}>
       <AlertIcon color={colors.danger} size={16} />
@@ -21,11 +21,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     alignItems: 'flex-start',
-    backgroundColor: 'rgba(229,72,77,0.12)',
+    backgroundColor: '#FBE4E4',
     borderWidth: 1,
-    borderColor: 'rgba(229,72,77,0.35)',
+    borderColor: '#EFC2C2',
     borderRadius: 10,
     padding: 12,
   },
-  text: { flex: 1, fontSize: 12, color: '#E8A3A6', lineHeight: 17 },
+  text: { flex: 1, fontSize: 12, color: colors.danger, lineHeight: 17 },
 });

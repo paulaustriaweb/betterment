@@ -20,6 +20,11 @@ export default function Root({ children }: PropsWithChildren) {
             own <title> here first, and the first one in the document wins. */}
         <meta name="description" content="An honest record of where your hours and money actually went." />
         <meta name="theme-color" content={colors.ground} />
+        {/* Without the manifest and its display:standalone, iOS treats the home-screen
+            entry as a plain bookmark and opens it in the default browser — Chrome, if
+            that's what's set. The apple- meta tags alone are no longer enough. */}
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Betterment" />

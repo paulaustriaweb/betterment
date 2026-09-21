@@ -500,11 +500,20 @@ there, and all three are load-bearing:
 `src/app/+html.tsx` supplies the home-screen metadata (apple-mobile-web-app tags, touch
 icon, theme colour) that Expo's default shell leaves out.
 
-**`web.output` is `single`, not `static`** — deliberately. Static rendering pre-renders each
-route to HTML at build time, and every screen here answers "what time is it now" against a
-database that doesn't exist at build time. The exported HTML therefore showed the build
-date and an empty day, and that stale markup stayed in the DOM after hydration. SPA output
-has none of that. The cost is that deep links need a rewrite to `/` on the host — see
-`vercel.json`.
+**`web.output` must stay `static`.** It was briefly switched to `single`, because static
+rendering used to bake the build date into the HTML — every screen answers "what time is it
+now" against a database that does not exist at build time, and that stale markup survived
+hydration. Gating the root layout on the database fixed that at the source: effects never
+run during static rendering, so the root renders `null` and every route's HTML is a 191-byte
+shell with no app content in it. Verified.
+
+`single` cannot be used, because **`+html.tsx` only applies to static rendering**. In SPA
+mode Expo emits its own default template and silently drops the shell — no manifest, no
+`apple-mobile-web-app-capable`, no theme colour. The symptom is subtle and device-only: iOS
+treats the home-screen entry as a plain bookmark and opens it in the default browser instead
+of launching standalone. If a future session is tempted by `single`, this is the trap.
+
+The host still needs unknown paths rewritten to `/` (`netlify.toml`, `vercel.json`);
+harmless with static output, since the filesystem is checked first.
 
 Expo Go remains the development environment; this only changes what ships.
