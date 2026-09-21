@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { useNow } from '@/hooks/useNow';
 import { colors, font, radius } from '@/lib/colors';
 import { PrimaryButton, Sheet } from './ui';
 
@@ -13,20 +14,34 @@ interface Props {
 }
 
 export function AddGoalSheet({ visible, onClose, onSave }: Props) {
+  const now = useNow();
   const [title, setTitle] = useState('');
   const [offset, setOffset] = useState(30);
 
-  const presets = useMemo(() => {
-    const now = new Date();
-    return [
+  // The sheet never unmounts, so reset on open — a title abandoned last time should
+  // not be sitting in the field the next time it's pulled up.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (visible) {
+      setTitle('');
+      setOffset(30);
+    }
+  }
+
+  // Keyed on `now`, not [] — "a week" has to mean a week from today, not a week
+  // from whenever the app was last launched.
+  const presets = useMemo(
+    () => [
       { label: 'A week', days: 7, date: addDays(now, 7) },
       { label: 'A month', days: 30, date: addMonths(now, 1) },
       { label: '3 months', days: 90, date: addMonths(now, 3) },
       { label: '6 months', days: 180, date: addMonths(now, 6) },
-    ];
-  }, []);
+    ],
+    [now]
+  );
 
-  const deadline = presets.find((p) => p.days === offset)?.date ?? addDays(new Date(), 30);
+  const deadline = presets.find((p) => p.days === offset)?.date ?? addDays(now, 30);
   const canSave = title.trim().length > 0;
 
   function save() {

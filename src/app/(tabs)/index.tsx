@@ -20,6 +20,7 @@ import { Sparkline } from '@/components/Sparkline';
 import { AlertIcon, GearIcon, PlusIcon } from '@/components/icons';
 import { DisclosureRow, PrimaryButton, RangePills, ScreenHeader, Sheet, StatCard } from '@/components/ui';
 import { useCategories } from '@/hooks/useCategories';
+import { useNow } from '@/hooks/useNow';
 import { useTimeBlocksForRange } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, type } from '@/lib/colors';
 import {
@@ -40,7 +41,7 @@ const RANGES = [
 
 export default function OverviewScreen() {
   const router = useRouter();
-  const now = useMemo(() => new Date(), []);
+  const now = useNow();
   const [range, setRange] = useState('today');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);

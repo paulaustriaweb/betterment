@@ -20,9 +20,9 @@ import { MoneyIcon, PlusIcon } from '@/components/icons';
 import { DisclosureRow, PrimaryButton, RangePills, ScreenHeader, Sheet, StatCard } from '@/components/ui';
 import { moneyColor } from '@/constants/money';
 import { useSetting } from '@/hooks/useSettings';
+import { useNow } from '@/hooks/useNow';
 import { useTransactionsForRange } from '@/hooks/useTransactions';
 import { colors, font, spacing, type } from '@/lib/colors';
-import type { Transaction } from '@/lib/types';
 import { formatCurrency, formatSigned } from '@/lib/currency';
 import { cumulative, netOf, sumByType, transactionLabel, withinRange } from '@/lib/money';
 
@@ -33,11 +33,13 @@ const RANGES = [
 ];
 
 export default function MoneyScreen() {
-  const now = useMemo(() => new Date(), []);
+  const now = useNow();
   const [range, setRange] = useState('month');
   const [listOpen, setListOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  // The id, not the row: holding the object would hand the edit sheet a snapshot
+  // taken before the last save.
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [tab, setTab] = useState<'expense' | 'income'>('expense');
   const [currency] = useSetting('currency', 'PHP');
 
@@ -137,7 +139,7 @@ export default function MoneyScreen() {
           <PrimaryButton
             label="Add transaction"
             onPress={() => {
-              setEditingTx(null);
+              setEditingId(null);
               setAddOpen(true);
             }}
             icon={<PlusIcon color={colors.surface} />}
@@ -177,7 +179,7 @@ export default function MoneyScreen() {
                   <Pressable
                     style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
                     onPress={() => {
-                      setEditingTx(t);
+                      setEditingId(t.id);
                       setListOpen(false);
                       setAddOpen(true);
                     }}
@@ -207,7 +209,7 @@ export default function MoneyScreen() {
       <AddTransactionSheet
         visible={addOpen}
         currency={currency}
-        editing={editingTx}
+        editing={transactions.find((t) => t.id === editingId) ?? null}
         onClose={() => setAddOpen(false)}
         onSubmit={(input, id) => (id ? update(id, input) : add(input))}
       />

@@ -8,11 +8,12 @@ import { CheckIcon, GoalsIcon, PlusIcon } from '@/components/icons';
 import { SwipeRow } from '@/components/SwipeRow';
 import { DisclosureRow, PrimaryButton, ScreenHeader, Sheet } from '@/components/ui';
 import { useGoals } from '@/hooks/useGoals';
+import { useNow } from '@/hooks/useNow';
 import { colors, font, spacing, type } from '@/lib/colors';
 import { countdownLabel, daysUntil, goalProgress, sortByDeadline, urgencyOf } from '@/lib/goals';
 
 export default function GoalsScreen() {
-  const now = useMemo(() => new Date(), []);
+  const now = useNow();
   const { goals, add, setComplete, remove } = useGoals();
   const [doneOpen, setDoneOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
