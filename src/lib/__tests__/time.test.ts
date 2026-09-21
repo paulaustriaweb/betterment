@@ -2,6 +2,7 @@ import {
   detectOverlap,
   findGaps,
   formatDuration,
+  greeting,
   longestGapMinutes,
   minutesByCategory,
   unaccountedHours,
@@ -124,6 +125,14 @@ describe('detectOverlap', () => {
 
   it('ignores the block currently being edited', () => {
     expect(detectOverlap(existing, new Date('2026-09-21T09:30:00'), new Date('2026-09-21T10:30:00'), 1)).toBeNull();
+  });
+});
+
+describe('greeting', () => {
+  it('follows the clock instead of always saying evening', () => {
+    expect(greeting(new Date('2026-09-21T08:00:00'))).toBe('Good morning');
+    expect(greeting(new Date('2026-09-21T14:00:00'))).toBe('Good afternoon');
+    expect(greeting(new Date('2026-09-21T21:00:00'))).toBe('Good evening');
   });
 });
 

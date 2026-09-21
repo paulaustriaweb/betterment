@@ -44,7 +44,7 @@ export default function AgendaScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <ScreenHeader title="Agenda" subtitle={format(selected, 'MMMM yyyy')} />
+        <ScreenHeader title="Your day" subtitle={format(selected, 'MMMM yyyy')} />
 
         <View style={styles.weekStrip}>
           {week.map((d) => {
@@ -62,7 +62,7 @@ export default function AgendaScreen() {
 
         <View style={styles.summary}>
           <Text style={styles.summaryLeft}>{isToday ? 'Today' : format(selected, 'EEEE, MMM d')}</Text>
-          <Text style={styles.summaryRight}>{formatDuration(totalGapMinutes)} open</Text>
+          <Text style={styles.summaryRight}>{formatDuration(totalGapMinutes)} not logged</Text>
         </View>
       </View>
 
@@ -88,7 +88,7 @@ export default function AgendaScreen() {
                 })
               }
             >
-              <Text style={styles.gapLabel}>{formatDuration(minutes)} unaccounted</Text>
+              <Text style={styles.gapLabel}>{formatDuration(minutes)} not logged</Text>
               {height > COMPACT_BLOCK ? <Text style={styles.gapHint}>Tap to log</Text> : null}
             </Pressable>
           );

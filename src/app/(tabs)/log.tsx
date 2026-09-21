@@ -90,7 +90,7 @@ export default function LogScreen() {
 
   function handleSave() {
     if (!categoryId) {
-      Alert.alert('Pick a category', 'Choose what this block was.');
+      Alert.alert('Pick a category', 'Choose what you were doing.');
       return;
     }
     const input: TimeBlockInput = {
@@ -140,12 +140,12 @@ export default function LogScreen() {
   return (
     <View style={styles.screen}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <ScreenHeader title="Log a block" subtitle={editingId ? 'Editing an entry' : 'New entry'} />
+        <ScreenHeader title="Add time" subtitle={editingId ? 'Editing an entry' : 'New entry'} />
 
         <View style={styles.heroCard}>
           <View style={styles.heroTop}>
             <View>
-              <Text style={styles.heroLabel}>Duration</Text>
+              <Text style={styles.heroLabel}>How long</Text>
               <Text style={styles.heroValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
                 {formatDuration(durMin)}
               </Text>
@@ -199,7 +199,7 @@ export default function LogScreen() {
           </View>
 
           <View style={styles.nudgeRow}>
-            <Text style={styles.nudgeHint}>Drag the block, or nudge the start</Text>
+            <Text style={styles.nudgeHint}>Drag it, or nudge the start</Text>
             <View style={styles.stepperPairSmall}>
               <Stepper direction="down" onPress={() => setStartMin(Math.max(0, startMin - STEP))} />
               <Stepper
@@ -238,21 +238,21 @@ export default function LogScreen() {
 
           <DisclosureRow
             icon={<TimelineIcon color={colors.rose} />}
-            title="Today's blocks"
-            hint={blocks.length === 0 ? 'Nothing logged yet' : `${blocks.length} logged · tap to edit`}
+            title="Today's entries"
+            hint={blocks.length === 0 ? 'Nothing logged yet' : `${blocks.length} so far · tap to edit`}
             onPress={() => setListOpen(true)}
           />
         </View>
 
         {overlap ? (
           <View style={styles.banner}>
-            <OverlapBanner message={`Overlaps ${overlapName ?? 'another block'}. Drag clear, or save anyway.`} />
+            <OverlapBanner message={`This overlaps ${overlapName ?? 'another entry'}. Move it, or save anyway.`} />
           </View>
         ) : null}
 
         <View style={styles.action}>
           <PrimaryButton
-            label={editingId ? 'Save changes' : 'Save block'}
+            label={editingId ? 'Save changes' : 'Save'}
             onPress={handleSave}
             icon={<PlusIcon color={colors.surface} />}
           />
@@ -261,12 +261,12 @@ export default function LogScreen() {
 
       <Sheet
         visible={listOpen}
-        title="Today's blocks"
+        title="Today's entries"
         subtitle={format(today, 'EEEE, MMM d')}
         onClose={() => setListOpen(false)}
       >
         {blocks.length === 0 ? (
-          <Text style={styles.empty}>Nothing logged yet. All 24 hours are still unaccounted for.</Text>
+          <Text style={styles.empty}>Nothing logged yet — the whole day is still empty.</Text>
         ) : (
           <>
             {blocks.map((b) => (

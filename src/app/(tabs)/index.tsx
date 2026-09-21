@@ -21,6 +21,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { useTimeBlocksForRange } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, type } from '@/lib/colors';
 import {
+  greeting,
   formatDuration,
   formatHoursPadded,
   longestGapMinutes,
@@ -97,7 +98,7 @@ export default function OverviewScreen() {
         minutes: totals.get(c.id) ?? 0,
       }))
       .filter((r) => r.minutes > 0);
-    rows.push({ key: 'unaccounted', label: 'Unaccounted', color: colors.rose, minutes: unaccounted });
+    rows.push({ key: 'unaccounted', label: 'Not logged', color: colors.rose, minutes: unaccounted });
     return rows.sort((a, b) => b.minutes - a.minutes);
   }, [blocks, categories, rangeStart, rangeEnd, unaccounted]);
 
@@ -113,11 +114,9 @@ export default function OverviewScreen() {
     <View style={styles.screen}>
       <View style={styles.content}>
         <ScreenHeader
-          title="Good evening"
+          title={greeting(now)}
           subtitle={
-            unaccounted === 0
-              ? 'Every hour accounted for.'
-              : `${formatDuration(unaccounted)} still unaccounted for`
+            unaccounted === 0 ? 'Every hour is logged.' : `${formatDuration(unaccounted)} not logged yet`
           }
           right={
             <Pressable style={styles.bell} onPress={() => setReminderOpen(true)}>
@@ -136,7 +135,7 @@ export default function OverviewScreen() {
               <View style={styles.heroChip}>
                 <AlertIcon color={colors.surface} size={14} />
               </View>
-              <Text style={styles.heroLabel}>Unaccounted</Text>
+              <Text style={styles.heroLabel}>Not logged</Text>
             </View>
             <Text style={styles.heroRange}>Last 7 days</Text>
           </View>
@@ -169,7 +168,7 @@ export default function OverviewScreen() {
 
         <View style={styles.action}>
           <PrimaryButton
-            label="Log a block"
+            label="Add time"
             onPress={() => router.push('/log')}
             icon={<PlusIcon color={colors.surface} />}
           />
@@ -178,7 +177,7 @@ export default function OverviewScreen() {
 
       <Sheet visible={sheetOpen} title="Where it went" subtitle={rangeLabel} onClose={() => setSheetOpen(false)}>
         {breakdown.length === 0 ? (
-          <Text style={styles.empty}>Nothing logged in this range yet.</Text>
+          <Text style={styles.empty}>Nothing logged here yet.</Text>
         ) : (
           <ScrollView style={styles.sheetScroll}>
             {breakdown.map((row) => {

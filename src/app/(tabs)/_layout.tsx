@@ -21,7 +21,7 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="agenda"
-        options={{ title: 'Agenda', tabBarIcon: ({ color }) => <AgendaIcon color={color as string} /> }}
+        options={{ title: 'Day', tabBarIcon: ({ color }) => <AgendaIcon color={color as string} /> }}
       />
       <Tabs.Screen
         name="log"

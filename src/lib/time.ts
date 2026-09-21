@@ -126,3 +126,10 @@ export function defaultStartTime(lastBlockEndTime: string | null): Date {
 export function formatTime(iso: string): string {
   return format(new Date(iso), 'h:mm a');
 }
+
+export function greeting(now: Date): string {
+  const hour = now.getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}

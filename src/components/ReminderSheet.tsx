@@ -50,7 +50,7 @@ export function ReminderSheet({ visible, onClose }: { visible: boolean; onClose:
     <Sheet visible={visible} title="Nightly reminder" subtitle="One nudge, then it leaves you alone" onClose={onClose}>
       <View style={styles.toggleRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.toggleTitle}>Remind me to log</Text>
+          <Text style={styles.toggleTitle}>Remind me each night</Text>
           <Text style={styles.toggleHint}>{on ? 'On' : 'Off'}</Text>
         </View>
         <Switch
@@ -80,8 +80,8 @@ export function ReminderSheet({ visible, onClose }: { visible: boolean; onClose:
         </Text>
       ) : (
         <Text style={styles.note}>
-          iOS won&apos;t let this override silent mode or force you to respond. It&apos;s a nudge — the gaps on
-          Agenda do the real work.
+          iOS won&apos;t let this ring through silent mode or force you to answer. It&apos;s a nudge — seeing
+          the empty hours on Your day is what actually gets you logging.
         </Text>
       )}
     </Sheet>

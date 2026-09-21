@@ -105,7 +105,7 @@ export default function GoalsScreen() {
           <DisclosureRow
             icon={<CheckIcon color={colors.rose} />}
             title="Completed"
-            hint={completed.length === 0 ? 'Nothing finished yet' : `${completed.length} finished · tap to review`}
+            hint={completed.length === 0 ? 'Nothing finished yet' : `${completed.length} done · tap to see`}
             onPress={() => setDoneOpen(true)}
           />
         </View>

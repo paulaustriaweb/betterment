@@ -92,9 +92,9 @@ export default function MoneyScreen() {
               <View style={styles.heroChip}>
                 <MoneyIcon color={colors.surface} size={14} strokeWidth={2.4} />
               </View>
-              <Text style={styles.heroLabel}>Net</Text>
+              <Text style={styles.heroLabel}>Left over</Text>
             </View>
-            <Text style={styles.heroRange}>{range === 'year' ? 'By month' : 'Running balance'}</Text>
+            <Text style={styles.heroRange}>{range === 'year' ? 'By month' : 'Day by day'}</Text>
           </View>
 
           <Text style={styles.heroValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
@@ -109,7 +109,7 @@ export default function MoneyScreen() {
               <Sparkline values={trend} label={transactions.length === 0 ? '—' : formatCurrency(net, currency)} />
             </View>
           ) : (
-            <Text style={styles.heroEmpty}>Nothing recorded {rangeLabel.toLowerCase()} yet.</Text>
+            <Text style={styles.heroEmpty}>Nothing added {rangeLabel.toLowerCase()} yet.</Text>
           )}
         </View>
 
@@ -121,11 +121,11 @@ export default function MoneyScreen() {
         <View style={styles.disclosure}>
           <DisclosureRow
             icon={<MoneyIcon color={colors.rose} size={16} />}
-            title="Transactions"
+            title="History"
             hint={
               transactions.length === 0
-                ? 'Nothing recorded yet'
-                : `${transactions.length} recorded · tap to review`
+                ? 'Nothing added yet'
+                : `${transactions.length} so far · tap to see`
             }
             onPress={() => setListOpen(true)}
           />
@@ -140,7 +140,7 @@ export default function MoneyScreen() {
         </View>
       </View>
 
-      <Sheet visible={listOpen} title="Transactions" subtitle={periodLabel} onClose={() => setListOpen(false)}>
+      <Sheet visible={listOpen} title="History" subtitle={periodLabel} onClose={() => setListOpen(false)}>
         <View style={styles.segment}>
           {(['expense', 'income'] as const).map((t) => {
             const active = t === tab;
@@ -159,7 +159,7 @@ export default function MoneyScreen() {
         </View>
 
         {rows.length === 0 ? (
-          <Text style={styles.empty}>No {tab === 'expense' ? 'expenses' : 'income'} in this period.</Text>
+          <Text style={styles.empty}>Nothing here yet.</Text>
         ) : (
           <ScrollView style={styles.listScroll}>
             {rows.map((t) => {
@@ -184,7 +184,7 @@ export default function MoneyScreen() {
                 </SwipeRow>
               );
             })}
-            <Text style={styles.hint}>Swipe a row left to delete it.</Text>
+            <Text style={styles.hint}>Swipe left to delete</Text>
           </ScrollView>
         )}
       </Sheet>
