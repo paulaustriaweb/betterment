@@ -8,8 +8,8 @@ export function ErrorScreen({ error, retry }: { error: Error; retry: () => void 
     <View style={styles.screen}>
       <Text style={styles.title}>Something broke</Text>
       <Text style={styles.body}>
-        The screen crashed before it could draw. Nothing you&apos;ve logged is affected — it&apos;s all still on
-        this device.
+        The app couldn&apos;t start this screen. Nothing you&apos;ve logged is affected — it&apos;s all still
+        on this device.
       </Text>
       <Text style={styles.detail} numberOfLines={4}>
         {error.message}
