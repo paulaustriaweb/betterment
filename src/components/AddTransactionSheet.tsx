@@ -75,8 +75,13 @@ export function AddTransactionSheet({ visible, currency, onClose, onSave }: Prop
         })}
       </View>
 
-      <Text style={[styles.amount, { color: parsed > 0 ? colors.ink : colors.inkFaint }]}>
-        {type === 'income' ? '+' : ''}
+      <Text
+        style={[styles.amount, { color: parsed > 0 ? colors.ink : colors.inkFaint }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.5}
+      >
+        {type === 'income' && parsed > 0 ? '+' : ''}
         {formatCurrency(parsed, currency)}
       </Text>
 

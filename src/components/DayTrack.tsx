@@ -159,8 +159,9 @@ export function DayTrack({ startMin, durMin, existing, onChange }: Props) {
       </View>
 
       <View style={styles.labels}>
-        {['12a', '6a', '12p', '6p', '12a'].map((label) => (
-          <Text key={label} style={styles.label}>
+        {/* "12a" appears at both ends, so the label can't be the key. */}
+        {['12a', '6a', '12p', '6p', '12a'].map((label, i) => (
+          <Text key={i} style={styles.label}>
             {label}
           </Text>
         ))}

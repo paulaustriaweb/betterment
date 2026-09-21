@@ -145,7 +145,9 @@ export default function LogScreen() {
           <View style={styles.heroTop}>
             <View>
               <Text style={styles.heroLabel}>Duration</Text>
-              <Text style={styles.heroValue}>{formatDuration(durMin)}</Text>
+              <Text style={styles.heroValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+                {formatDuration(durMin)}
+              </Text>
             </View>
             <View style={styles.stepperPair}>
               <Stepper direction="down" tone="onRose" onPress={() => setDurMin(Math.max(STEP, durMin - STEP))} />

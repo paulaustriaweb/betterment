@@ -78,7 +78,10 @@ export function StatCard({ label, value, tone }: { label: string; value: string;
   return (
     <View style={[styles.statCard, { backgroundColor: bg }]}>
       <Text style={[styles.statLabel, { color: labelColor }]}>{label}</Text>
-      <Text style={[styles.statValue, { color: fg }]}>{value}</Text>
+      {/* Shrink rather than wrap — a figure broken across two lines is unreadable. */}
+      <Text style={[styles.statValue, { color: fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+        {value}
+      </Text>
     </View>
   );
 }

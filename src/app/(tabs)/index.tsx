@@ -141,7 +141,9 @@ export default function OverviewScreen() {
             <Text style={styles.heroRange}>Last 7 days</Text>
           </View>
 
-          <Text style={styles.heroValue}>{formatHoursPadded(unaccounted)}</Text>
+          <Text style={styles.heroValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+            {formatHoursPadded(unaccounted)}
+          </Text>
           <Text style={styles.heroSub}>
             of {Math.round(totalMinutes / 60)}h {rangeLabel.toLowerCase()}
           </Text>

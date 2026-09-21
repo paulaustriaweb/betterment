@@ -21,7 +21,7 @@ import { moneyColor } from '@/constants/money';
 import { useSetting } from '@/hooks/useSettings';
 import { useTransactionsForRange } from '@/hooks/useTransactions';
 import { colors, font, spacing, type } from '@/lib/colors';
-import { formatCurrency } from '@/lib/currency';
+import { formatCurrency, formatSigned } from '@/lib/currency';
 import { cumulative, netOf, sumByType, transactionLabel, withinRange } from '@/lib/money';
 
 const RANGES = [
@@ -96,11 +96,10 @@ export default function MoneyScreen() {
             <Text style={styles.heroRange}>{range === 'year' ? 'By month' : 'Running balance'}</Text>
           </View>
 
-          <Text style={styles.heroValue}>
-            {net > 0 ? '+' : ''}
-            {formatCurrency(net, currency)}
+          <Text style={styles.heroValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
+            {formatSigned(net, currency)}
           </Text>
-          <Text style={styles.heroSub}>
+          <Text style={styles.heroSub} numberOfLines={1}>
             {formatCurrency(spent, currency)} out · {formatCurrency(earned, currency)} in
           </Text>
 
@@ -173,9 +172,11 @@ export default function MoneyScreen() {
                     <Text style={styles.rowLabel}>{label}</Text>
                     <Text style={styles.rowDate}>{format(new Date(t.date), 'MMM d')}</Text>
                   </View>
-                  <Text style={[styles.rowAmount, t.type === 'income' && styles.rowAmountIn]}>
-                    {t.type === 'income' ? '+' : '−'}
-                    {formatCurrency(t.amount, currency)}
+                  <Text
+                    style={[styles.rowAmount, t.type === 'income' && styles.rowAmountIn]}
+                    numberOfLines={1}
+                  >
+                    {formatSigned(t.type === 'income' ? t.amount : -t.amount, currency)}
                   </Text>
                 </Pressable>
               );
