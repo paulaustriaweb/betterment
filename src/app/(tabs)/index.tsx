@@ -13,9 +13,11 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { CategoriesSheet } from '@/components/CategoriesSheet';
 import { ReminderSheet } from '@/components/ReminderSheet';
+import { SettingsSheet } from '@/components/SettingsSheet';
 import { Sparkline } from '@/components/Sparkline';
-import { AlertIcon, BellIcon, PlusIcon } from '@/components/icons';
+import { AlertIcon, GearIcon, PlusIcon } from '@/components/icons';
 import { DisclosureRow, PrimaryButton, RangePills, ScreenHeader, Sheet, StatCard } from '@/components/ui';
 import { useCategories } from '@/hooks/useCategories';
 import { useTimeBlocksForRange } from '@/hooks/useTimeBlocks';
@@ -41,7 +43,9 @@ export default function OverviewScreen() {
   const now = useMemo(() => new Date(), []);
   const [range, setRange] = useState('today');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
 
   const categories = useCategories();
 
@@ -119,8 +123,13 @@ export default function OverviewScreen() {
             unaccounted === 0 ? 'Every hour is logged.' : `${formatDuration(unaccounted)} not logged yet`
           }
           right={
-            <Pressable style={styles.bell} onPress={() => setReminderOpen(true)}>
-              <BellIcon color={colors.inkSoft} />
+            <Pressable
+              style={styles.bell}
+              onPress={() => setSettingsOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
+            >
+              <GearIcon color={colors.inkSoft} />
             </Pressable>
           }
         />
@@ -200,7 +209,20 @@ export default function OverviewScreen() {
         )}
       </Sheet>
 
+      <SettingsSheet
+        visible={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onOpenReminder={() => {
+          setSettingsOpen(false);
+          setReminderOpen(true);
+        }}
+        onOpenCategories={() => {
+          setSettingsOpen(false);
+          setCategoriesOpen(true);
+        }}
+      />
       <ReminderSheet visible={reminderOpen} onClose={() => setReminderOpen(false)} />
+      <CategoriesSheet visible={categoriesOpen} onClose={() => setCategoriesOpen(false)} />
     </View>
   );
 }

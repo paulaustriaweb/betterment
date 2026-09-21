@@ -155,3 +155,49 @@ export function TimelineIcon({ color, size = 16, strokeWidth = 2.2 }: IconProps)
     </Svg>
   );
 }
+
+export function GearIcon({ color, size = 16, strokeWidth = 2 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" {...stroke(color, strokeWidth)}>
+      <Circle cx={12} cy={12} r={3.2} />
+      <Path d="M12 2.5v2.6M12 18.9v2.6M21.5 12h-2.6M5.1 12H2.5M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8M18.7 18.7l-1.8-1.8M7.1 7.1 5.3 5.3" />
+    </Svg>
+  );
+}
+
+export function DownloadIcon({ color, size = 16, strokeWidth = 2.2 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" {...stroke(color, strokeWidth)}>
+      <Path d="M12 3v11" />
+      <Path d="m7.5 10 4.5 4.5 4.5-4.5" />
+      <Path d="M4 19h16" />
+    </Svg>
+  );
+}
+
+export function TagIcon({ color, size = 16, strokeWidth = 2.2 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" {...stroke(color, strokeWidth)}>
+      <Path d="M3.5 11.4V4h7.4l9.1 9.1-7.4 7.4z" />
+      <Circle cx={7.9} cy={7.9} r={1.4} />
+    </Svg>
+  );
+}
+
+export function EyeOffIcon({ color, size = 16, strokeWidth = 2.2 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" {...stroke(color, strokeWidth)}>
+      <Path d="M4 12s3.2-5.5 8-5.5S20 12 20 12s-3.2 5.5-8 5.5S4 12 4 12Z" />
+      <Path d="m4 4 16 16" />
+    </Svg>
+  );
+}
+
+export function EyeIcon({ color, size = 16, strokeWidth = 2.2 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" {...stroke(color, strokeWidth)}>
+      <Path d="M4 12s3.2-5.5 8-5.5S20 12 20 12s-3.2 5.5-8 5.5S4 12 4 12Z" />
+      <Circle cx={12} cy={12} r={2.4} />
+    </Svg>
+  );
+}

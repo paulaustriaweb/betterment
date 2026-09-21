@@ -1,4 +1,4 @@
-import { formatCurrency, formatSigned } from '../currency';
+import { formatCurrency, formatSigned, isValidCurrency } from '../currency';
 
 // Asserted on structure rather than the exact symbol: which glyph ICU picks for
 // a currency varies by platform, and the app runs on Hermes, not Node.
@@ -22,6 +22,27 @@ describe('formatCurrency', () => {
 
   it('respects the currency code', () => {
     expect(formatCurrency(5, 'USD')).toContain('5');
+  });
+
+  it('falls back to the bare code rather than throwing on a bad one', () => {
+    const out = formatCurrency(1234, 'nope');
+    expect(out).toContain('1234');
+    expect(out).toContain('nope');
+  });
+});
+
+describe('isValidCurrency', () => {
+  it('accepts three-letter codes', () => {
+    expect(isValidCurrency('PHP')).toBe(true);
+    expect(isValidCurrency('usd')).toBe(true);
+  });
+
+  it('rejects anything that is not three letters', () => {
+    expect(isValidCurrency('')).toBe(false);
+    expect(isValidCurrency('US')).toBe(false);
+    expect(isValidCurrency('DOLLAR')).toBe(false);
+    expect(isValidCurrency('US1')).toBe(false);
+    expect(isValidCurrency('$')).toBe(false);
   });
 });
 
