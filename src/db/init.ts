@@ -6,16 +6,22 @@ let ready: Promise<void> | null = null;
 
 /**
  * On the web the database file is held with an exclusive OPFS lock, so a second
- * tab on the same origin can't open it — it gets a DOMException whose message
- * ("The object is in an invalid state") explains nothing and suggests no way out.
- * WebKit throws InvalidStateError for this, Chromium NoModificationAllowedError.
+ * tab on the same origin can't open it. WebKit calls that InvalidStateError,
+ * Chromium NoModificationAllowedError, and neither message says anything a person
+ * can act on.
+ *
+ * Matched on the text, not `error.name`: expo-sqlite rebuilds worker errors as
+ * `new Error(message)` on the way back across postMessage, so the DOMException
+ * name is gone by the time it reaches us and only survives inside the string.
  */
+const LOCKED = /InvalidStateError|NoModificationAllowedError|createSyncAccessHandle/;
+
 function explain(error: unknown): Error {
-  const name = error instanceof Error ? error.name : '';
-  if (name === 'InvalidStateError' || name === 'NoModificationAllowedError') {
-    return new Error('Betterment is already open in another tab or window. Close it, then try again.');
+  const text = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  if (LOCKED.test(text)) {
+    return new Error('Betterment is already open in another tab or window. Close it, then tap Try again.');
   }
-  return error instanceof Error ? error : new Error(String(error));
+  return error instanceof Error ? error : new Error(text);
 }
 
 /**
