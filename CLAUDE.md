@@ -36,6 +36,9 @@ A personal iOS time and money tracker, built by one person for their own nightly
 ## 2. Hard constraints (real, not stylistic — do not relitigate these)
 
 - **iOS only**, via **Expo Go**. No Mac, no Apple Developer account, no standalone build, no App Store.
+  ⚠️ **This constraint has a consequence nobody priced in — see §13.** Expo Go can't run the app
+  without a dev server on the same network, so it isn't usable away from the computer and can't be
+  installed by anyone else. That is unresolved and may change the target platform.
 - **Free.** No paid services, no hosting, no subscriptions, no cloud DB.
 - **Offline-first.** Works with zero network access. No accounts, no login, no sync.
 - **Deadline: September 27, 2026.**
@@ -338,49 +341,107 @@ Ranked by value, highest first:
 
 ---
 
-## 10. Build order — 6 days remaining (Sept 21 → Sept 27)
+## 10. Build status
 
-Replaces the original 18-day plan, which assumed a Sept 9 start that didn't happen. Ordered by the project's own cutting rule: **Log tab + day bar are the app; Money and Goals are stretch.**
+The original six-day plan (§ timeline check above) was completed in a single session on
+2026-09-21. All five tabs are built against real SQLite. The deadline is Sept 27, so there
+is slack — spend it on the open items in §12, not on new features.
 
 | Day | Goal | Status |
 |---|---|---|
-| 1 (Sept 21–22) | Expo + expo-router scaffold, folder structure, SQLite schema + migration runner, seeded categories, design tokens, shared UI primitives, **Log tab** wired to SQLite (add / edit / delete) | ✅ done |
-| 2 (Sept 23) | **Overview tab**: hero unaccounted card + 7-day sparkline, Logged / Longest-gap stat cards, "Where it went" breakdown sheet, range pills (today/week/month) | ✅ done |
-| 3 (Sept 24) | **Agenda tab**: 24h scrollable timeline auto-scrolled to now, week date strip, now-line, category blocks, dashed tappable gap blocks that route to Log pre-filled | ✅ done |
-| 4 (Sept 25) | Nightly local notification (default 11:30 PM) → deep-links to Log, configured from a Reminder sheet behind the Overview bell | ✅ code done, **needs on-device test** |
-| 5 (Sept 26) | **Money tab**: net hero + running-balance sparkline, Spent/Earned cards, transactions sheet, add sheet with in-sheet keypad | ✅ done |
-| 6 (Sept 27) | **Goals tab**: countdown hero with elapsed-progress bar, upcoming cards, completed sheet, add sheet with live deadline dates. README + MIT license. | ✅ done |
+| 1 | Scaffold, SQLite schema + migrations, seeded categories, design tokens, shared primitives, **Log** | ✅ |
+| 2 | **Overview** — unaccounted hero, 7-day sparkline, stat cards, breakdown sheet | ✅ |
+| 3 | **Day** (agenda) — 24h timeline, now-line, tappable gaps routing to Log | ✅ |
+| 4 | Nightly local notification + Reminder sheet | ✅ code, ❌ never fired on device |
+| 5 | **Money** — net hero, running balance, history sheet, add/edit with in-sheet keypad | ✅ |
+| 6 | **Goals** — countdown hero, progress, completed sheet, add sheet. README + MIT licence | ✅ |
 
-If Day 2 or 3 slips, Money and Goals both drop from v1 without discussion — that was already decided, not a new decision to make under pressure.
-
-**Verify persistence before calling any day done.** Add a block, fully reload the app, confirm it's still there.
+Repo: https://github.com/paulaustriaweb/betterment (branch `main`, all work pushed).
 
 ---
 
 ## 11. Where things stand
 
-Scaffolded and working: Expo SDK 57 + expo-router (5 tabs), TypeScript strict, SQLite with a `PRAGMA user_version` migration runner and seeded categories, Instrument Sans loaded via `@expo-google-fonts`, design tokens in `src/lib/colors.ts`, shared primitives in `src/components/ui.tsx` (Card, ScreenHeader, RangePills, StatCard, DisclosureRow, Stepper, PrimaryButton, Sheet), plus `Sparkline`. **Log and Overview are both fully wired to SQLite.** `tsc`, `expo lint` and `jest` (18 tests) are clean, and `expo export --platform ios` bundles successfully.
+**Verified on a real iPhone:** a logged time block survives a full force-quit and reopen.
+Overview reported 19h30 not logged + 4h30 Reading = 24h exactly, which also confirms the
+span-merge maths against real data.
 
-`src/lib/time.ts` is the analytical core and carries the test suite: `loggedMinutesInRange`, `unaccountedMinutesInRange`, `findGaps`, `longestGapMinutes`, `minutesByCategory`, `detectOverlap`. **Spans are merged before summing** — overlapping blocks are allowed by design, so naive summing double-counted minutes and could report negative unaccounted time. Don't reintroduce that.
+**Never verified on device:** the nightly notification firing, Money and Goals persistence
+(different tables from time blocks), and the transaction *update* path.
 
-Deliberate deviations from the mockups, both correct for a real app:
-- The Log mockup has a close button; the real Log is a **tab**, so there's nothing to close.
-- Edit/delete live in a **"Today's blocks" sheet** rather than a permanent list, which keeps Log inside the five-block density rule while preserving the CRUD the spec requires.
+`tsc`, `expo lint`, 50 Jest tests and `expo export --platform ios` are all clean. Tests
+cover `lib/` only — the date arithmetic, gap detection, money sums, goal countdowns. There
+are no component tests; the UI was checked by using it.
 
-**All five tabs are built and wired to SQLite.** 41 tests across `time`, `money` and `goals`.
+### Conventions a new session must not undo
+- **Spans are merged before summing** in `lib/time.ts`. Overlapping blocks are allowed by
+  design, so naive summing double-counts minutes and can report negative unaccounted time.
+- **Two React Compiler lint rules bite repeatedly.** `react-hooks/set-state-in-effect`:
+  never sync state in an effect — adjust during render against a signature (see Log's route
+  params, and AddTransactionSheet loading the row being edited). `react-hooks/immutability`:
+  no reassigning a variable inside `.map` during render (why `cumulative()` lives in
+  `lib/money.ts`). `react-hooks/refs` is disabled *locally* in `DayTrack` with the reasoning
+  inline — PanResponder callbacks never run during render, and recreating the responder
+  mid-drag would strand the baseline `gestureState.dx` is measured against.
+- **Swipe rows use core `Animated` + `PanResponder`, not gesture-handler.** They render
+  inside a `Modal`, where gesture-handler needs its own root view and silently stops
+  responding without one.
+- **Wording is deliberately plain** (see §3 and the copy commit): "not logged" not
+  "unaccounted", "entry" not "block", "left over" not "net", "Day" not "Agenda".
 
-Remaining before it's shippable as a portfolio piece:
-1. **Put your name in `LICENSE`** — it still says `[YOUR NAME]`.
-2. Screenshots or a screen recording for the README.
-3. On-device check of Money and Goals persistence (time blocks are confirmed; the other two tables are not).
-4. Nightly reminder still unproven on hardware — see the Expo Go risk below.
+### Deliberate deviations from the mockups
+- The Log mockup has a close button; the real Log is a tab, so there is nothing to close.
+- Edit/delete live in sheets rather than permanent lists, keeping screens inside the
+  five-block density rule while preserving the CRUD the spec requires.
 
-Money uses an **in-sheet keypad** (`AmountPad`) rather than a `TextInput` — the OS keyboard covers half a bottom sheet. Amounts are held as a string while typing and parsed on save. Currency comes from `settings.currency` through `formatCurrency`, never a hardcoded symbol.
+---
 
-Two React Compiler lint rules have bitten already and will again: `react-hooks/set-state-in-effect` (no state syncing in effects — adjust during render) and `react-hooks/immutability` (no reassigning a variable inside a `.map` during render — the cumulative-sum helper in `lib/money.ts` exists because of this).
+## 12. Open items, in the order they should be done
 
-Agenda → Log passes `start` and `dur` params for a tapped gap. Log is a tab and never remounts, so it adjusts state **during render** against a param signature rather than syncing in an effect (`react-hooks/set-state-in-effect` will fail the build otherwise).
+**1. Logging a past day is broken — fix first, it writes wrong data.**
+`Day` lets you browse backwards, but `(tabs)/log.tsx` hardcodes `const today = new Date()`.
+Tapping a block on a past day opens Log showing *today*; tapping a past day's gap passes
+`start`/`dur` through and Log writes them to **today**. "I forgot to log yesterday" is the
+most likely real-world need and it currently corrupts data. Agenda must pass the selected
+date, and Log must honour it (including its `useTimeBlocksForDay` scope and `dayStart`).
 
-**Persistence verified on device 2026-09-21.** A Reading block survived a full force-quit and reopen; Overview reported 19h30 unaccounted + 4h30 Reading = 24h exactly, which also validates the span-merge maths against real data.
+**2. No export, no backup.** The database lives in Expo Go's sandbox — delete or reinstall
+Expo Go and every entry is gone silently. §7 already calls JSON export the highest-value
+good-to-have; it is roughly forty lines (`SELECT *` per table + `expo-file-system` write +
+`expo-sharing`). Nothing else protects a year of logs.
 
-**Open risk: notifications in Expo Go.** Local scheduled notifications are implemented but unproven on hardware. Expo Go has been narrowing `expo-notifications` support, and this project can't use a dev client. If the nightly reminder won't fire from Expo Go, **don't fight it** — the reminder is explicitly the weaker half of the design (§5); the gaps on Agenda are the real pressure. Cut it, note it in the README, move on.
+**3. No error boundary.** Any render crash gives a white screen with no way back.
+
+**4. Settings are unreachable.** `settings.currency` is *read* by Money but nothing ever
+writes it, and categories aren't editable despite the schema supporting it. Both are
+required for the "anyone could clone this" goal in §1. The Reminder sheet is the only
+config surface; a Settings sheet behind the Overview bell is the natural home.
+
+**5. Accessibility is essentially absent.** One `accessibilityLabel` in the whole app, and
+fixed font sizes ignore Dynamic Type.
+
+---
+
+## 13. The distribution problem — unresolved, and it decides the project
+
+**Expo Go cannot run this app without a dev server.** `expo-updates` does not work in Expo
+Go, so there is no publish-and-open path. Every use requires `npx expo start` running on a
+machine reachable by the phone. That means the app cannot be used away from the computer,
+and cannot be installed by anyone else at all.
+
+Escaping it needs a development or production build, and on iOS that needs a $99 Apple
+Developer account — ruled out by §2. The free Apple ID + 7-day sideload route is real but
+needs a signed IPA, which needs a Mac or paid EAS credentials.
+
+**The live option, not yet tested: ship the web build.** `npx expo export --platform web`
+to a free static host, then Safari → Add to Home Screen. No laptop, free, installable.
+Open questions that must be answered before committing to it:
+- Does `expo-sqlite` actually work in the browser for this project? **Untested — this
+  single question decides whether the plan is viable.**
+- Browser storage is a different store, so existing phone data does not migrate.
+- Notifications and haptics do not work on iOS web.
+
+This is a product decision, not a coding task. It changes the project from "iOS via Expo Go"
+to "web app installed to the home screen", and the iOS-only constraint in §2 was written
+before this tradeoff was visible. **Do not start it without the user deciding.** The next
+concrete step is to run a web build and report what survives.
