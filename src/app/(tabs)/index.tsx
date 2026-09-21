@@ -23,6 +23,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { useNow } from '@/hooks/useNow';
 import { useTimeBlocksForRange } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, type } from '@/lib/colors';
+import { fitFontSize } from '@/lib/fit';
 import {
   greeting,
   formatDuration,
@@ -150,7 +151,10 @@ export default function OverviewScreen() {
             <Text style={styles.heroRange}>Last 7 days</Text>
           </View>
 
-          <Text style={styles.heroValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+          <Text
+            style={[styles.heroValue, { fontSize: fitFontSize(formatHoursPadded(unaccounted), 48, 8) }]}
+            numberOfLines={1}
+          >
             {formatHoursPadded(unaccounted)}
           </Text>
           <Text style={styles.heroSub}>

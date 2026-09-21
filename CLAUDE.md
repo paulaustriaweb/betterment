@@ -469,10 +469,11 @@ that makes this a real daily app. Note for the user's benefit: nothing is *downl
 there is no installable file and no App Store, just a URL saved to the home screen.
 
 Tradeoffs knowingly accepted:
-- **Notifications and haptics don't work on iOS web.** The nightly reminder effectively
-  dies. That is tolerable — §5 already calls it the weaker half of the design, and the
-  empty hours on Day are what actually create the pressure. Say so in the README rather
-  than pretending it works.
+- **Notifications don't work on iOS web.** The nightly reminder effectively dies. That is
+  tolerable — §5 already calls it the weaker half of the design, and the empty hours on Day
+  are what actually create the pressure. The Reminder sheet says so outright rather than
+  pretending. **Haptics do survive**, contrary to the original assumption: expo-haptics 57
+  ships an iOS Safari implementation that fakes feedback with a hidden switch toggle.
 - **Existing phone data does not migrate.** Browser storage is a different store from the
   SQLite file inside Expo Go's sandbox. Whatever is currently logged on the phone starts
   over. This makes §12 item 2 (JSON export) more valuable, not less.

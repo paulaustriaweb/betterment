@@ -28,7 +28,13 @@ export function AmountPad({ value, onChange }: Props) {
   return (
     <View style={styles.pad}>
       {KEYS.map((key) => (
-        <Pressable key={key} style={styles.key} onPress={() => press(key)}>
+        <Pressable
+          key={key}
+          style={styles.key}
+          onPress={() => press(key)}
+          accessibilityRole="button"
+          accessibilityLabel={key === 'back' ? 'Delete last digit' : key === '.' ? 'Decimal point' : key}
+        >
           {key === 'back' ? (
             <Text style={styles.backLabel}>⌫</Text>
           ) : (

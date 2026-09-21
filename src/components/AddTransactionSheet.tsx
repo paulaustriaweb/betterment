@@ -6,6 +6,7 @@ import { EXPENSE_CATEGORIES, INCOME_SOURCES } from '@/constants/money';
 import type { TransactionInput } from '@/db/transactions';
 import { colors, font, radius } from '@/lib/colors';
 import { formatCurrency } from '@/lib/currency';
+import { fitFontSize } from '@/lib/fit';
 import { transactionLabel } from '@/lib/money';
 import type { Transaction } from '@/lib/types';
 import { AmountPad } from './AmountPad';
@@ -81,6 +82,9 @@ export function AddTransactionSheet({ visible, currency, editing, onClose, onSub
               key={t}
               style={[styles.segmentItem, active && styles.segmentItemActive]}
               onPress={() => switchType(t)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={t === 'expense' ? 'Expense' : 'Income'}
             >
               <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>
                 {t === 'expense' ? 'Expense' : 'Income'}
@@ -91,10 +95,14 @@ export function AddTransactionSheet({ visible, currency, editing, onClose, onSub
       </View>
 
       <Text
-        style={[styles.amount, { color: parsed > 0 ? colors.ink : colors.inkFaint }]}
+        style={[
+          styles.amount,
+          {
+            color: parsed > 0 ? colors.ink : colors.inkFaint,
+            fontSize: fitFontSize(formatCurrency(parsed, currency), 40, 9),
+          },
+        ]}
         numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.5}
       >
         {type === 'income' && parsed > 0 ? '+' : ''}
         {formatCurrency(parsed, currency)}
@@ -107,6 +115,9 @@ export function AddTransactionSheet({ visible, currency, editing, onClose, onSub
             <Pressable
               key={o.label}
               style={[styles.chip, { backgroundColor: active ? colors.ink : colors.ground }]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={o.label}
               onPress={() => {
                 Haptics.selectionAsync();
                 setLabel(o.label);

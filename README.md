@@ -94,7 +94,7 @@ The biggest compromise: **there are no component tests.** The test suite covers 
 
 The second: the **nightly reminder is the weakest part of the design and always was.** iOS won't let a local notification override silent mode or demand a response. It's a nudge. The actual pressure comes from opening Your day and seeing three hours of dashed emptiness where your evening went — which is why that interaction got the engineering attention and the notification got a checkbox.
 
-Shipping as a web app makes that worse rather than better: **iOS gives a home-screen web app no scheduled notifications at all**, so the reminder is dead on the platform the app actually runs on. The sheet says so plainly instead of pretending to work. Haptics are gone there too. That's the price of the only free route to an installable app, and the gaps on Your day were always the part carrying the weight.
+Shipping as a web app makes that worse rather than better: **iOS gives a home-screen web app no scheduled notifications at all**, so the reminder is dead on the platform the app actually runs on. The sheet says so plainly instead of pretending to work. (Haptics survive — `expo-haptics` fakes them on iOS Safari with a hidden switch toggle.) That's the price of the only free route to an installable app, and the gaps on Your day were always the part carrying the weight.
 
 ## Not built (deliberately)
 

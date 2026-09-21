@@ -15,6 +15,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { useNow } from '@/hooks/useNow';
 import { useLastTimeBlock, useTimeBlocksForDay } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, type } from '@/lib/colors';
+import { fitFontSize } from '@/lib/fit';
 import type { TimeBlock } from '@/lib/types';
 import { detectOverlap, formatDuration } from '@/lib/time';
 
@@ -232,7 +233,10 @@ export default function LogScreen() {
           <View style={styles.heroTop}>
             <View>
               <Text style={styles.heroLabel}>How long</Text>
-              <Text style={styles.heroValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+              <Text
+                style={[styles.heroValue, { fontSize: fitFontSize(formatDuration(durMin), 40, 8) }]}
+                numberOfLines={1}
+              >
                 {formatDuration(durMin)}
               </Text>
             </View>

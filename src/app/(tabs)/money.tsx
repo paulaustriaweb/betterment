@@ -23,6 +23,7 @@ import { useSetting } from '@/hooks/useSettings';
 import { useNow } from '@/hooks/useNow';
 import { useTransactionsForRange } from '@/hooks/useTransactions';
 import { colors, font, spacing, type } from '@/lib/colors';
+import { fitFontSize } from '@/lib/fit';
 import { formatCurrency, formatSigned } from '@/lib/currency';
 import { cumulative, netOf, sumByType, transactionLabel, withinRange } from '@/lib/money';
 
@@ -101,7 +102,10 @@ export default function MoneyScreen() {
             <Text style={styles.heroRange}>{range === 'year' ? 'By month' : 'Day by day'}</Text>
           </View>
 
-          <Text style={styles.heroValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
+          <Text
+            style={[styles.heroValue, { fontSize: fitFontSize(formatSigned(net, currency), 44, 9) }]}
+            numberOfLines={1}
+          >
             {formatSigned(net, currency)}
           </Text>
           <Text style={styles.heroSub} numberOfLines={1}>

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { colors, radius, spacing, type } from '@/lib/colors';
+import { fitFontSize } from '@/lib/fit';
 import { ChevronRightIcon, CloseIcon, MinusIcon, PlusIcon } from './icons';
 
 /** White card on the tinted ground. The base surface for everything. */
@@ -82,7 +83,10 @@ export function StatCard({ label, value, tone }: { label: string; value: string;
     <View style={[styles.statCard, { backgroundColor: bg }]} accessible accessibilityLabel={`${label}: ${value}`}>
       <Text style={[styles.statLabel, { color: labelColor }]}>{label}</Text>
       {/* Shrink rather than wrap — a figure broken across two lines is unreadable. */}
-      <Text style={[styles.statValue, { color: fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+      <Text
+        style={[styles.statValue, { color: fg, fontSize: fitFontSize(value, type.stat.fontSize, 9) }]}
+        numberOfLines={1}
+      >
         {value}
       </Text>
     </View>
