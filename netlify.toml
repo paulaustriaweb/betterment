@@ -1,0 +1,25 @@
+# expo-sqlite runs as wasm with the database in OPFS, which needs SharedArrayBuffer,
+# which needs cross-origin isolation. Without these two headers the app is a blank
+# screen. require-corp rather than credentialless — Safari only supports the former,
+# and iOS Safari is the browser this has to work in.
+#
+# The build is a single-page app, so unknown paths fall through to index.html.
+# Netlify checks the filesystem first, so real files still win.
+
+[build]
+  command = "npx expo export --platform web"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Embedder-Policy = "require-corp"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

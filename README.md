@@ -60,9 +60,9 @@ Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Embedder-Policy: require-corp
 ```
 
-`expo-sqlite` compiles to WebAssembly and stores the database in OPFS, which needs `SharedArrayBuffer`, which needs cross-origin isolation. `vercel.json` in this repo sets both; on another host, configure the equivalent. (`require-corp` rather than `credentialless` — Safari only supports the former.)
+`expo-sqlite` compiles to WebAssembly and stores the database in OPFS, which needs `SharedArrayBuffer`, which needs cross-origin isolation. (`require-corp` rather than `credentialless` — Safari only supports the former.) The build is also a single-page app, so unknown paths have to be rewritten to `/`.
 
-The build is a single-page app, so the host also needs unknown paths rewritten to `/`. `vercel.json` does that too.
+`netlify.toml` and `vercel.json` both set all of this up, so either host works with no configuration. On anything else, configure the equivalent — and note that a host which can't set response headers at all, such as GitHub Pages, can't run this.
 
 ---
 

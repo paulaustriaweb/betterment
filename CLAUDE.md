@@ -462,7 +462,8 @@ Developer account — ruled out by §2. The free Apple ID + 7-day sideload route
 needs a signed IPA, which needs a Mac or paid EAS credentials.
 
 **Decision (2026-09-22): ship the web build.** `npx expo export --platform web` → a free
-static host (Vercel is simplest for static output) → Safari → Add to Home Screen. It gets
+static host (Netlify or Vercel — both are configured in the repo) → Safari → Add to Home
+Screen. It gets
 an icon, launches fullscreen, needs no laptop, costs nothing, and is the only free route
 that makes this a real daily app. Note for the user's benefit: nothing is *downloaded* —
 there is no installable file and no App Store, just a URL saved to the home screen.
@@ -491,9 +492,10 @@ there, and all three are load-bearing:
 3. **The host must send `Cross-Origin-Opener-Policy: same-origin` and
    `Cross-Origin-Embedder-Policy: require-corp`.** OPFS and the sync bridge need
    `SharedArrayBuffer`, which needs cross-origin isolation. Without these headers the app
-   is a blank screen. `vercel.json` sets them; any other host needs the equivalent, which
-   rules out hosts that can't set headers at all (GitHub Pages). `require-corp`, not
-   `credentialless` — Safari only supports the former.
+   is a blank screen. `netlify.toml` and `vercel.json` both set them, so either host works
+   unconfigured; anything else needs the equivalent, which rules out hosts that can't set
+   headers at all (GitHub Pages). `require-corp`, not `credentialless` — Safari only
+   supports the former.
 
 `src/app/+html.tsx` supplies the home-screen metadata (apple-mobile-web-app tags, touch
 icon, theme colour) that Expo's default shell leaves out.
