@@ -1,13 +1,29 @@
 import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+/**
+ * The shipping target is the web build installed to the home screen (CLAUDE.md §13),
+ * and iOS gives a web app no scheduled local notifications at all. Everything below
+ * is a no-op there, and the Reminder sheet says so rather than pretending.
+ */
+export const remindersSupported = Platform.OS !== 'web';
+
+if (remindersSupported) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    }),
+  });
+}
+
+export function addReminderTapListener(onTap: () => void): () => void {
+  if (!remindersSupported) return () => {};
+  const sub = Notifications.addNotificationResponseReceivedListener(onTap);
+  return () => sub.remove();
+}
 
 export async function ensurePermission(): Promise<boolean> {
   const current = await Notifications.getPermissionsAsync();
@@ -19,9 +35,10 @@ export async function ensurePermission(): Promise<boolean> {
 /**
  * One daily reminder, replacing any previous one. iOS will not let this override
  * silent mode or force interaction — it's a nudge, not an alarm. The pressure
- * comes from the gaps on Agenda.
+ * comes from the gaps on Your day.
  */
 export async function scheduleNightlyReminder(hour: number, minute: number): Promise<boolean> {
+  if (!remindersSupported) return false;
   await Notifications.cancelAllScheduledNotificationsAsync();
   if (!(await ensurePermission())) return false;
 
@@ -41,6 +58,7 @@ export async function scheduleNightlyReminder(hour: number, minute: number): Pro
 }
 
 export async function cancelNightlyReminder(): Promise<void> {
+  if (!remindersSupported) return;
   await Notifications.cancelAllScheduledNotificationsAsync();
 }
 

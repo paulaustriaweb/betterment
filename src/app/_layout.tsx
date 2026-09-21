@@ -5,22 +5,28 @@ import {
   InstrumentSans_700Bold,
   useFonts,
 } from '@expo-google-fonts/instrument-sans';
-import * as Notifications from 'expo-notifications';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, type ErrorBoundaryProps } from 'expo-router';
+import Head from 'expo-router/head';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
+import { ErrorScreen } from '@/components/ErrorScreen';
 import { initDb } from '@/db/init';
 import { DbVersionProvider } from '@/hooks/DbVersionContext';
 import { colors } from '@/lib/colors';
+import { addReminderTapListener } from '@/lib/notifications';
 
-// Runs once, synchronously, when this module first loads at app startup.
-initDb();
 SplashScreen.preventAutoHideAsync();
+
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return <ErrorScreen error={error} retry={retry} />;
+}
 
 export default function RootLayout() {
   const router = useRouter();
+  const [dbReady, setDbReady] = useState(false);
+  const [dbError, setDbError] = useState<Error | null>(null);
   const [fontsLoaded] = useFonts({
     InstrumentSans_400Regular,
     InstrumentSans_500Medium,
@@ -29,25 +35,38 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync();
-  }, [fontsLoaded]);
+    initDb().then(
+      () => setDbReady(true),
+      (e: Error) => setDbError(e)
+    );
+  }, []);
+
+  const ready = fontsLoaded && dbReady;
+
+  useEffect(() => {
+    if (ready || dbError) SplashScreen.hideAsync();
+  }, [ready, dbError]);
 
   // Tapping the nightly reminder lands straight on Log.
-  useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener(() => {
-      router.push('/log');
-    });
-    return () => sub.remove();
-  }, [router]);
-
-  if (!fontsLoaded) return null;
+  useEffect(() => addReminderTapListener(() => router.push('/log')), [router]);
 
   return (
-    <DbVersionProvider>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}>
-        <Stack.Screen name="(tabs)" />
-      </Stack>
-    </DbVersionProvider>
+    // Head sits outside the readiness gate so the exported HTML carries a title —
+    // static rendering never gets as far as opening the database.
+    <>
+      <Head>
+        <title>Betterment</title>
+      </Head>
+      {dbError ? (
+        <ErrorScreen error={dbError} retry={() => setDbError(null)} />
+      ) : ready ? (
+        <DbVersionProvider>
+          <StatusBar style="dark" />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}>
+            <Stack.Screen name="(tabs)" />
+          </Stack>
+        </DbVersionProvider>
+      ) : null}
+    </>
   );
 }

@@ -1,13 +1,17 @@
-import { getDb } from './client';
+import { openDb } from './client';
 import { runMigrations } from './migrations';
 import { seedIfEmpty } from './seed';
 
-let initialized = false;
+let ready: Promise<void> | null = null;
 
-export function initDb(): void {
-  if (initialized) return;
-  const db = getDb();
-  runMigrations(db);
-  seedIfEmpty(db);
-  initialized = true;
+/** Idempotent. Nothing may query the database until the returned promise resolves. */
+export function initDb(): Promise<void> {
+  if (!ready) {
+    ready = (async () => {
+      const db = await openDb();
+      runMigrations(db);
+      seedIfEmpty(db);
+    })();
+  }
+  return ready;
 }
