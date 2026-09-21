@@ -43,7 +43,15 @@ export function SettingsSheet({
   }
 
   return (
-    <Sheet visible={visible} title="Settings" subtitle="Yours to change" onClose={onClose}>
+    <Sheet
+      visible={visible}
+      title="Settings"
+      subtitle="Yours to change"
+      onClose={() => {
+        setStatus(null);
+        onClose();
+      }}
+    >
       <View style={styles.field}>
         <Text style={styles.fieldLabel}>Currency</Text>
         <View style={styles.currencyRow}>

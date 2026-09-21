@@ -25,20 +25,18 @@ export function AddTransactionSheet({ visible, currency, editing, onClose, onSub
   const [amount, setAmount] = useState('0');
   const [label, setLabel] = useState<string | null>(null);
 
-  // The sheet stays mounted, so load the row being edited during render rather
-  // than syncing in an effect.
-  const editingId = editing?.id ?? null;
-  const [loadedId, setLoadedId] = useState<number | null>(null);
-  if (editingId !== loadedId) {
-    setLoadedId(editingId);
-    if (editing) {
-      setType(editing.type);
-      setAmount(String(editing.amount));
-      setLabel(transactionLabel(editing));
-    } else {
-      setType('expense');
-      setAmount('0');
-      setLabel(null);
+  // The sheet stays mounted, so load during render rather than syncing in an effect.
+  // Keyed on `visible` as well as the row: opening the same row twice, or opening a
+  // blank one after abandoning a half-typed amount, has to start clean — otherwise
+  // a stale figure is sitting there waiting to be saved as if it were fresh.
+  const signature = `${visible}|${editing?.id ?? ''}`;
+  const [loaded, setLoaded] = useState(signature);
+  if (signature !== loaded) {
+    setLoaded(signature);
+    if (visible) {
+      setType(editing?.type ?? 'expense');
+      setAmount(editing ? String(editing.amount) : '0');
+      setLabel(editing ? transactionLabel(editing) : null);
     }
   }
 

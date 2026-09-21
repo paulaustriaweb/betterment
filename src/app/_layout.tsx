@@ -27,6 +27,7 @@ export default function RootLayout() {
   const router = useRouter();
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState<Error | null>(null);
+  const [dbAttempt, setDbAttempt] = useState(0);
   const [fontsLoaded] = useFonts({
     InstrumentSans_400Regular,
     InstrumentSans_500Medium,
@@ -39,7 +40,7 @@ export default function RootLayout() {
       () => setDbReady(true),
       (e: Error) => setDbError(e)
     );
-  }, []);
+  }, [dbAttempt]);
 
   const ready = fontsLoaded && dbReady;
 
@@ -58,7 +59,13 @@ export default function RootLayout() {
         <title>Betterment</title>
       </Head>
       {dbError ? (
-        <ErrorScreen error={dbError} retry={() => setDbError(null)} />
+        <ErrorScreen
+          error={dbError}
+          retry={() => {
+            setDbError(null);
+            setDbAttempt((n) => n + 1);
+          }}
+        />
       ) : ready ? (
         <DbVersionProvider>
           <StatusBar style="dark" />
