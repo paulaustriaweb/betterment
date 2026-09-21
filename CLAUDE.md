@@ -35,16 +35,21 @@ A personal iOS time and money tracker, built by one person for their own nightly
 
 ## 2. Hard constraints (real, not stylistic — do not relitigate these)
 
-- **iOS only**, via **Expo Go**. No Mac, no Apple Developer account, no standalone build, no App Store.
-  ⚠️ **This constraint has a consequence nobody priced in — see §13.** Expo Go can't run the app
-  without a dev server on the same network, so it isn't usable away from the computer and can't be
-  installed by anyone else. That is unresolved and may change the target platform.
+- **Target platform: the web build, installed to the iPhone home screen.** Decided 2026-09-22.
+  Expo Go was the original target and is still the **development** environment (`npx expo start`),
+  but it can't be the shipping one: it needs a dev server on the same network, so the app can't be
+  used away from the computer and can't be installed by anyone else. The shipping path is
+  `npx expo export --platform web` → free static host → Safari → Add to Home Screen. See §13 for
+  the reasoning, the tradeoffs accepted, and the one question that still has to be answered.
+- No Mac, no Apple Developer account, no standalone iOS build, no App Store. Unchanged.
 - **Free.** No paid services, no hosting, no subscriptions, no cloud DB.
 - **Offline-first.** Works with zero network access. No accounts, no login, no sync.
 - **Deadline: September 27, 2026.**
 
-### ⚠️ Timeline reality check
-The original plan assumed 18 build days from Sept 9. As of today (**Sept 21**), 12 of those days are gone and the project folder was still empty when this file was written — **6 days remain**, not 18. Section 10 below replaces the old 18-day build order with a 6-day one built around the project's own stated cutting rule: *if a day slips, cut a feature, don't extend the deadline. Money and Goals are cuttable. Log tab and the day bar are not.* If Sept 27 has since moved, or isn't a real hard deadline, say so and this section gets revised — everything downstream of it assumes 6 days.
+### Timeline
+The original 18-day plan assumed a Sept 9 start that never happened. It was replaced with a
+six-day plan on Sept 21, and that plan was finished the same day — see §10. All five tabs are
+built, so the remaining days are slack. Spend them on §12 and §13, not on new features.
 
 ---
 
@@ -398,6 +403,10 @@ are no component tests; the UI was checked by using it.
 
 ## 12. Open items, in the order they should be done
 
+**Do §13's web-build test before any of this.** It takes minutes and decides whether
+`src/db/` survives as written — no point polishing screens on a storage layer that may have
+to change.
+
 **1. Logging a past day is broken — fix first, it writes wrong data.**
 `Day` lets you browse backwards, but `(tabs)/log.tsx` hardcodes `const today = new Date()`.
 Tapping a block on a past day opens Log showing *today*; tapping a past day's gap passes
@@ -422,7 +431,7 @@ fixed font sizes ignore Dynamic Type.
 
 ---
 
-## 13. The distribution problem — unresolved, and it decides the project
+## 13. Distribution — decided: ship the web build
 
 **Expo Go cannot run this app without a dev server.** `expo-updates` does not work in Expo
 Go, so there is no publish-and-open path. Every use requires `npx expo start` running on a
@@ -433,15 +442,24 @@ Escaping it needs a development or production build, and on iOS that needs a $99
 Developer account — ruled out by §2. The free Apple ID + 7-day sideload route is real but
 needs a signed IPA, which needs a Mac or paid EAS credentials.
 
-**The live option, not yet tested: ship the web build.** `npx expo export --platform web`
-to a free static host, then Safari → Add to Home Screen. No laptop, free, installable.
-Open questions that must be answered before committing to it:
-- Does `expo-sqlite` actually work in the browser for this project? **Untested — this
-  single question decides whether the plan is viable.**
-- Browser storage is a different store, so existing phone data does not migrate.
-- Notifications and haptics do not work on iOS web.
+**Decision (2026-09-22): ship the web build.** `npx expo export --platform web` → a free
+static host (Vercel is simplest for static output) → Safari → Add to Home Screen. It gets
+an icon, launches fullscreen, needs no laptop, costs nothing, and is the only free route
+that makes this a real daily app. Note for the user's benefit: nothing is *downloaded* —
+there is no installable file and no App Store, just a URL saved to the home screen.
 
-This is a product decision, not a coding task. It changes the project from "iOS via Expo Go"
-to "web app installed to the home screen", and the iOS-only constraint in §2 was written
-before this tradeoff was visible. **Do not start it without the user deciding.** The next
-concrete step is to run a web build and report what survives.
+Tradeoffs knowingly accepted:
+- **Notifications and haptics don't work on iOS web.** The nightly reminder effectively
+  dies. That is tolerable — §5 already calls it the weaker half of the design, and the
+  empty hours on Day are what actually create the pressure. Say so in the README rather
+  than pretending it works.
+- **Existing phone data does not migrate.** Browser storage is a different store from the
+  SQLite file inside Expo Go's sandbox. Whatever is currently logged on the phone starts
+  over. This makes §12 item 2 (JSON export) more valuable, not less.
+
+**The one open question, and the next concrete step:** does `expo-sqlite` actually work in
+the browser here? It needs the wasm build and OPFS, and it is **untested**. Run a web build
+and load it before doing anything else — if SQLite doesn't survive, the storage layer has
+to change and that reshapes `src/db/` entirely. Everything above this line assumes it works.
+
+Expo Go remains the development environment; this only changes what ships.
