@@ -360,6 +360,7 @@ is slack — spend it on the open items in §12, not on new features.
 | 4 | Nightly local notification + Reminder sheet | ✅ code, ❌ never fired on device |
 | 5 | **Money** — net hero, running balance, history sheet, add/edit with in-sheet keypad | ✅ |
 | 6 | **Goals** — countdown hero, progress, completed sheet, add sheet. README + MIT licence | ✅ |
+| — | Web build works, past-day logging, backup, error boundary, Settings, a11y (2026-09-22) | ✅ |
 
 Repo: https://github.com/paulaustriaweb/betterment (branch `main`, all work pushed).
 
@@ -371,12 +372,19 @@ Repo: https://github.com/paulaustriaweb/betterment (branch `main`, all work push
 Overview reported 19h30 not logged + 4h30 Reading = 24h exactly, which also confirms the
 span-merge maths against real data.
 
-**Never verified on device:** the nightly notification firing, Money and Goals persistence
-(different tables from time blocks), and the transaction *update* path.
+**Verified in the web build (2026-09-22, desktop browser):** the app boots, SQLite opens,
+categories seed, an entry saves, and it survives a full page reload. See §13 — this is what
+settles the distribution question.
 
-`tsc`, `expo lint`, 50 Jest tests and `expo export --platform ios` are all clean. Tests
-cover `lib/` only — the date arithmetic, gap detection, money sums, goal countdowns. There
-are no component tests; the UI was checked by using it.
+**Never verified on device:** the nightly notification firing, Money and Goals persistence
+(different tables from time blocks), and the transaction *update* path. Nor has the web
+build been opened on an actual iPhone yet — that is the one remaining check that matters,
+because iOS Safari is the shipping platform and it is the browser least like the one it was
+tested in.
+
+`tsc`, `expo lint`, 53 Jest tests and `expo export` for both ios and web are all clean.
+Tests cover `lib/` only — the date arithmetic, gap detection, money sums, goal countdowns,
+currency validation. There are no component tests; the UI was checked by using it.
 
 ### Conventions a new session must not undo
 - **Spans are merged before summing** in `lib/time.ts`. Overlapping blocks are allowed by
@@ -403,31 +411,42 @@ are no component tests; the UI was checked by using it.
 
 ## 12. Open items, in the order they should be done
 
-**Do §13's web-build test before any of this.** It takes minutes and decides whether
-`src/db/` survives as written — no point polishing screens on a storage layer that may have
-to change.
+Items 1–5 from the previous handover are **done** (2026-09-22), along with §13's web-build
+test that gated them. What changed, so a fresh session doesn't redo it:
 
-**1. Logging a past day is broken — fix first, it writes wrong data.**
-`Day` lets you browse backwards, but `(tabs)/log.tsx` hardcodes `const today = new Date()`.
-Tapping a block on a past day opens Log showing *today*; tapping a past day's gap passes
-`start`/`dur` through and Log writes them to **today**. "I forgot to log yesterday" is the
-most likely real-world need and it currently corrupts data. Agenda must pass the selected
-date, and Log must honour it (including its `useTimeBlocksForDay` scope and `dayStart`).
+- **Logging a past day now works.** `Day` passes the selected `date` (and, for a tapped
+  entry, its `edit` id) through to Log, which holds a `day` in state instead of assuming
+  today. Log's header names the day and offers a "Today" pill to get back; "End now" hides
+  on a past day because it is meaningless there.
+- **Backup exists.** Settings → *Back up my data* writes every table to JSON — a file
+  download on web, the share sheet on native (`src/lib/backup.ts`). One-way by design;
+  there is no restore.
+- **Error boundary exists.** `ErrorBoundary` in `src/app/_layout.tsx` renders
+  `ErrorScreen` instead of a white screen, with a retry.
+- **Settings are reachable**, behind the gear on Overview (it replaced the bell; the
+  Reminder sheet is now one row inside it). Currency is editable and validated, categories
+  can be renamed and hidden.
+- **Accessibility**: roles, labels and selected/checked state on every icon-only and
+  chip-style control. `Stepper` now *requires* a `label` — a bare plus sign told a screen
+  reader nothing.
 
-**2. No export, no backup.** The database lives in Expo Go's sandbox — delete or reinstall
-Expo Go and every entry is gone silently. §7 already calls JSON export the highest-value
-good-to-have; it is roughly forty lines (`SELECT *` per table + `expo-file-system` write +
-`expo-sharing`). Nothing else protects a year of logs.
+**What is actually left, in order:**
 
-**3. No error boundary.** Any render crash gives a white screen with no way back.
+**1. Open the web build on a real iPhone.** Everything in §13 was verified in a desktop
+Chromium browser. iOS Safari is the shipping platform and the one most likely to differ —
+OPFS behaviour, the `require-corp` header, Add to Home Screen, and whether the sync bridge
+stays responsive after the app has been backgrounded. Deploy `dist/` somewhere with the two
+headers set and use it for a night.
 
-**4. Settings are unreachable.** `settings.currency` is *read* by Money but nothing ever
-writes it, and categories aren't editable despite the schema supporting it. Both are
-required for the "anyone could clone this" goal in §1. The Reminder sheet is the only
-config surface; a Settings sheet behind the Overview bell is the natural home.
+**2. Decide what a restore looks like.** Backup is one-way. On web, "clear website data"
+erases everything, and there is no way back in even holding the JSON. An import that reads
+a file and replays inserts is maybe sixty lines and is the natural next feature.
 
-**5. Accessibility is essentially absent.** One `accessibilityLabel` in the whole app, and
-fixed font sizes ignore Dynamic Type.
+**3. Categories can only be renamed or hidden, not added.** Fine for now — the colours are
+design tokens, not free choices — but someone cloning this may want a ninth category.
+
+**4. Dynamic Type.** Font sizes are fixed numbers throughout. React Native scales `Text` by
+default, but the layouts were designed at one size and were never checked at larger ones.
 
 ---
 
@@ -457,9 +476,33 @@ Tradeoffs knowingly accepted:
   SQLite file inside Expo Go's sandbox. Whatever is currently logged on the phone starts
   over. This makes §12 item 2 (JSON export) more valuable, not less.
 
-**The one open question, and the next concrete step:** does `expo-sqlite` actually work in
-the browser here? It needs the wasm build and OPFS, and it is **untested**. Run a web build
-and load it before doing anything else — if SQLite doesn't survive, the storage layer has
-to change and that reshapes `src/db/` entirely. Everything above this line assumes it works.
+**The open question is answered (2026-09-22): `expo-sqlite` does work in the browser.**
+Tested by exporting the web build, serving it, logging an entry and reloading — the entry
+survived. `src/db/` keeps its synchronous query API. Three things were required to get
+there, and all three are load-bearing:
+
+1. **`metro.config.js` must add `wasm` to `resolver.assetExts`.** Without it the web export
+   fails outright — Metro can't resolve `expo-sqlite`'s `wa-sqlite.wasm`.
+2. **The database must be opened *asynchronously*.** `openDatabaseSync` can never work on
+   web: it blocks the main thread spinning on `Atomics` while waiting for a worker that
+   hasn't compiled its wasm yet, and throws `Sync operation timeout` every time. `initDb()`
+   now awaits `openDatabaseAsync` and the root layout waits on it before rendering. Every
+   query after that stays synchronous, because by then the worker is warm.
+3. **The host must send `Cross-Origin-Opener-Policy: same-origin` and
+   `Cross-Origin-Embedder-Policy: require-corp`.** OPFS and the sync bridge need
+   `SharedArrayBuffer`, which needs cross-origin isolation. Without these headers the app
+   is a blank screen. `vercel.json` sets them; any other host needs the equivalent, which
+   rules out hosts that can't set headers at all (GitHub Pages). `require-corp`, not
+   `credentialless` — Safari only supports the former.
+
+`src/app/+html.tsx` supplies the home-screen metadata (apple-mobile-web-app tags, touch
+icon, theme colour) that Expo's default shell leaves out.
+
+**`web.output` is `single`, not `static`** — deliberately. Static rendering pre-renders each
+route to HTML at build time, and every screen here answers "what time is it now" against a
+database that doesn't exist at build time. The exported HTML therefore showed the build
+date and an empty day, and that stale markup stayed in the DOM after hydration. SPA output
+has none of that. The cost is that deep links need a rewrite to `/` on the host — see
+`vercel.json`.
 
 Expo Go remains the development environment; this only changes what ships.
