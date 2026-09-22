@@ -3,6 +3,8 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 
 import { useCategories, useCategoryEdits } from '@/hooks/useCategories';
 import { colors, font } from '@/lib/colors';
+import { Banner } from './Banner';
+import { useToast } from './Toast';
 import { EyeIcon, EyeOffIcon } from './icons';
 import { Sheet } from './ui';
 
@@ -15,10 +17,39 @@ export function CategoriesSheet({ visible, onClose }: { visible: boolean; onClos
   const categories = useCategories();
   const { rename, setActive } = useCategoryEdits();
   const [draft, setDraft] = useState<{ id: number; name: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   function commit() {
-    if (draft && draft.name.trim()) rename(draft.id, draft.name.trim());
+    const pending = draft;
     setDraft(null);
+    if (!pending || !pending.name.trim()) return;
+    const next = pending.name.trim();
+    const before = categories.find((c) => c.id === pending.id);
+    if (before?.name === next) return;
+    try {
+      rename(pending.id, next);
+      setError(null);
+      toast(`Renamed to "${next}".`, {
+        action: before ? { label: 'Undo', onPress: () => rename(pending.id, before.name) } : undefined,
+      });
+    } catch (e) {
+      console.error('category rename failed', e);
+      setError("Couldn't rename that — try again.");
+    }
+  }
+
+  function toggleActive(id: number, name: string, active: boolean) {
+    try {
+      setActive(id, active);
+      setError(null);
+      toast(active ? `${name} is back.` : `${name} hidden.`, {
+        action: { label: 'Undo', onPress: () => setActive(id, !active) },
+      });
+    } catch (e) {
+      console.error('category visibility failed', e);
+      setError("Couldn't change that — try again.");
+    }
   }
 
   return (
@@ -54,7 +85,7 @@ export function CategoriesSheet({ visible, onClose }: { visible: boolean; onClos
               )}
               <Pressable
                 style={styles.toggle}
-                onPress={() => setActive(c.id, !c.isActive)}
+                onPress={() => toggleActive(c.id, c.name, !c.isActive)}
                 hitSlop={8}
                 accessibilityRole="switch"
                 accessibilityState={{ checked: c.isActive }}
@@ -69,6 +100,12 @@ export function CategoriesSheet({ visible, onClose }: { visible: boolean; onClos
             </View>
           );
         })}
+        {error ? (
+          <View style={styles.banner}>
+            <Banner message={error} />
+          </View>
+        ) : null}
+
         <Text style={styles.hint}>
           Hidden categories drop out of the picker on Log. Anything already logged against one keeps its name
           and colour.
@@ -97,5 +134,6 @@ const styles = StyleSheet.create({
     paddingBottom: 3,
   },
   toggle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  banner: { marginTop: 12 },
   hint: { fontFamily: font.regular, fontSize: 11.5, color: colors.inkSoft, lineHeight: 17, paddingVertical: 16 },
 });

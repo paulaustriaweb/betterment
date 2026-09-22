@@ -11,6 +11,7 @@ import {
   remindersSupported,
   scheduleNightlyReminder,
 } from '@/lib/notifications';
+import { useToast } from './Toast';
 import { Sheet, Stepper } from './ui';
 
 const STEP = 15;
@@ -19,6 +20,8 @@ export function ReminderSheet({ visible, onClose }: { visible: boolean; onClose:
   const [time, setTime] = useSetting('reminder_time', '23:30');
   const [enabled, setEnabled] = useSetting('reminder_enabled', '0');
   const [denied, setDenied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   const { hour, minute } = parseReminderTime(time);
   const on = enabled === '1' && remindersSupported;
@@ -35,7 +38,15 @@ export function ReminderSheet({ visible, onClose }: { visible: boolean; onClose:
   }
 
   function toggle(next: boolean) {
-    setEnabled(next ? '1' : '0');
+    try {
+      setEnabled(next ? '1' : '0');
+      setError(null);
+      toast(next ? 'Reminder on.' : 'Reminder off.');
+    } catch (e) {
+      console.error('reminder toggle failed', e);
+      setError("Couldn't save that — try again.");
+      return;
+    }
     void apply(next, hour, minute);
   }
 
@@ -43,7 +54,14 @@ export function ReminderSheet({ visible, onClose }: { visible: boolean; onClose:
     const total = (hour * 60 + minute + delta + 1440) % 1440;
     const h = Math.floor(total / 60);
     const m = total % 60;
-    setTime(formatReminderTime(h, m));
+    try {
+      setTime(formatReminderTime(h, m));
+      setError(null);
+    } catch (e) {
+      console.error('reminder time save failed', e);
+      setError("Couldn't save that — try again.");
+      return;
+    }
     if (on) void apply(true, h, m);
   }
 
@@ -78,6 +96,8 @@ export function ReminderSheet({ visible, onClose }: { visible: boolean; onClose:
           <Stepper direction="up" label="15 minutes later" onPress={() => shift(STEP)} />
         </View>
       </View>
+
+      {error ? <Text style={styles.denied}>{error}</Text> : null}
 
       {!remindersSupported ? (
         <Text style={styles.note}>

@@ -42,6 +42,10 @@ export function insertGoal(title: string, deadlineIso: string): number {
   return result.lastInsertRowId;
 }
 
+export function updateGoal(id: number, title: string, deadlineIso: string): void {
+  getDb().runSync('UPDATE goals SET title = ?, deadline = ? WHERE id = ?', [title, deadlineIso, id]);
+}
+
 export function setGoalComplete(id: number, complete: boolean): void {
   getDb().runSync('UPDATE goals SET is_complete = ? WHERE id = ?', [complete ? 1 : 0, id]);
 }

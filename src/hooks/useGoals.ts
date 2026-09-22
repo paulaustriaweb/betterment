@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 
-import { deleteGoal, insertGoal, listGoals, setGoalComplete } from '@/db/goals';
+import { deleteGoal, insertGoal, listGoals, setGoalComplete, updateGoal } from '@/db/goals';
 import { useDbVersion } from './DbVersionContext';
 
 export function useGoals() {
@@ -13,6 +13,17 @@ export function useGoals() {
     (title: string, deadlineIso: string) => {
       try {
         return insertGoal(title, deadlineIso);
+      } finally {
+        bump();
+      }
+    },
+    [bump]
+  );
+
+  const update = useCallback(
+    (id: number, title: string, deadlineIso: string) => {
+      try {
+        updateGoal(id, title, deadlineIso);
       } finally {
         bump();
       }
@@ -42,5 +53,5 @@ export function useGoals() {
     [bump]
   );
 
-  return { goals, add, setComplete, remove };
+  return { goals, add, update, setComplete, remove };
 }

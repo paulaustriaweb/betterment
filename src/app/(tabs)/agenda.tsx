@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ScreenHeader } from '@/components/ui';
 import { useCategories } from '@/hooks/useCategories';
 import { useNow } from '@/hooks/useNow';
+import { useSetting } from '@/hooks/useSettings';
 import { useTimeBlocksForDay } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, tintFor } from '@/lib/colors';
 import { findGaps, formatDuration } from '@/lib/time';
@@ -23,6 +24,8 @@ export default function AgendaScreen() {
   const now = useNow();
   const [selected, setSelected] = useState(() => startOfDay(now));
 
+  const [weekStartSetting] = useSetting('week_starts_on', '0');
+  const weekStartsOn = weekStartSetting === '1' ? 1 : 0;
   const categories = useCategories();
   const blocks = useTimeBlocksForDay(selected).blocks;
   const gaps = useMemo(() => findGaps(blocks, selected), [blocks, selected]);
@@ -33,9 +36,9 @@ export default function AgendaScreen() {
   const dayParam = format(selected, 'yyyy-MM-dd');
 
   const week = useMemo(() => {
-    const start = startOfWeek(selected);
+    const start = startOfWeek(selected, { weekStartsOn });
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  }, [selected]);
+  }, [selected, weekStartsOn]);
 
   useEffect(() => {
     // Open on the current hour rather than midnight — nobody logs at 3am. The clock

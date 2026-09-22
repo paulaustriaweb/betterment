@@ -8,14 +8,20 @@ import { Banner } from '@/components/Banner';
 import { CheckIcon, GoalsIcon, PlusIcon } from '@/components/icons';
 import { SwipeRow } from '@/components/SwipeRow';
 import { DisclosureRow, PrimaryButton, ScreenHeader, Sheet } from '@/components/ui';
+import { useToast } from '@/components/Toast';
 import { useGoals } from '@/hooks/useGoals';
+import { useSetting } from '@/hooks/useSettings';
 import { useNow } from '@/hooks/useNow';
 import { colors, font, spacing, type } from '@/lib/colors';
 import { countdownLabel, daysUntil, goalProgress, sortByDeadline, urgencyOf } from '@/lib/goals';
+import type { Goal } from '@/lib/types';
 
 export default function GoalsScreen() {
   const now = useNow();
-  const { goals, add, setComplete, remove } = useGoals();
+  const { goals, add, update, setComplete, remove } = useGoals();
+  const toast = useToast();
+  const [weekStart] = useSetting('week_starts_on', '0');
+  const [editing, setEditing] = useState<Goal | null>(null);
   const [doneOpen, setDoneOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -29,17 +35,40 @@ export default function GoalsScreen() {
   const upcoming = active.slice(1);
 
   function toggle(id: number, complete: boolean) {
-    Haptics.notificationAsync(
-      complete ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
-    );
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setComplete(id, complete);
+    try {
+      Haptics.notificationAsync(
+        complete ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
+      );
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setComplete(id, complete);
+      setNotice(null);
+      toast(complete ? 'Done — nice.' : 'Back on the list.', {
+        action: { label: 'Undo', onPress: () => setComplete(id, !complete) },
+      });
+    } catch (error) {
+      console.error('goal toggle failed', error);
+      setNotice("Couldn't update that — try again.");
+    }
   }
 
-  function handleDelete(id: number) {
+  function saveGoal(title: string, deadlineIso: string, id?: number) {
+    if (id) {
+      update(id, title, deadlineIso);
+      toast('Goal updated.');
+    } else {
+      add(title, deadlineIso);
+      toast('Goal added.');
+    }
+  }
+
+  function handleDelete(goal: Goal) {
     try {
-      remove(id);
+      remove(goal.id);
       setNotice(null);
+      // Undo rather than a confirm sheet, per the States board.
+      toast(`Deleted "${goal.title}".`, {
+        action: { label: 'Undo', onPress: () => add(goal.title, goal.deadline) },
+      });
     } catch (error) {
       // An unhandled throw here left the row sitting there looking frozen.
       console.error('goal delete failed', error);
@@ -76,7 +105,16 @@ export default function GoalsScreen() {
                   {nextUrgency === 'overdue' ? 'days over' : nextDays === 1 ? 'day left' : 'days left'}
                 </Text>
               </View>
-              <Text style={styles.heroTitle}>{next.title}</Text>
+              <Pressable
+                onPress={() => {
+                  setEditing(next);
+                  setAddOpen(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit "${next.title}"`}
+              >
+                <Text style={styles.heroTitle}>{next.title}</Text>
+              </Pressable>
               <View style={styles.progressTrack}>
                 <View
                   style={[
@@ -109,10 +147,18 @@ export default function GoalsScreen() {
                     accessibilityState={{ checked: false }}
                     accessibilityLabel={`Mark "${g.title}" done`}
                   />
-                  <View style={{ flex: 1 }}>
+                  <Pressable
+                    style={{ flex: 1 }}
+                    onPress={() => {
+                      setEditing(g);
+                      setAddOpen(true);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Edit "${g.title}"`}
+                  >
                     <Text style={styles.cardTitle}>{g.title}</Text>
                     <Text style={styles.cardDate}>{format(new Date(g.deadline), 'MMM d')}</Text>
-                  </View>
+                  </Pressable>
                   <View style={[styles.pill, soon && styles.pillSoon]}>
                     <Text style={[styles.pillText, soon && styles.pillTextSoon]}>{countdownLabel(days)}</Text>
                   </View>
@@ -134,7 +180,10 @@ export default function GoalsScreen() {
         <View style={styles.action}>
           <PrimaryButton
             label="Add goal"
-            onPress={() => setAddOpen(true)}
+            onPress={() => {
+              setEditing(null);
+              setAddOpen(true);
+            }}
             icon={<PlusIcon color={colors.surface} />}
           />
         </View>
@@ -157,7 +206,7 @@ export default function GoalsScreen() {
         ) : (
           <ScrollView style={styles.doneScroll}>
             {completed.map((g) => (
-              <SwipeRow key={g.id} onDelete={() => handleDelete(g.id)}>
+              <SwipeRow key={g.id} onDelete={() => handleDelete(g)}>
                 <Pressable
                   style={({ pressed }) => [styles.doneRow, pressed && styles.rowPressed]}
                   onPress={() => toggle(g.id, false)}
@@ -177,7 +226,13 @@ export default function GoalsScreen() {
         )}
       </Sheet>
 
-      <AddGoalSheet visible={addOpen} onClose={() => setAddOpen(false)} onSave={add} />
+      <AddGoalSheet
+        visible={addOpen}
+        editing={editing}
+        weekStartsOn={weekStart === '1' ? 1 : 0}
+        onClose={() => setAddOpen(false)}
+        onSave={saveGoal}
+      />
     </View>
   );
 }

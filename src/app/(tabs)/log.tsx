@@ -9,10 +9,12 @@ import { DayTrack, type TrackBlock } from '@/components/DayTrack';
 import { NoteIcon, PlusIcon, TimelineIcon } from '@/components/icons';
 import { Banner } from '@/components/Banner';
 import { SwipeRow } from '@/components/SwipeRow';
+import { useToast } from '@/components/Toast';
 import { Card, DisclosureRow, PrimaryButton, ScreenHeader, Sheet, Stepper } from '@/components/ui';
 import type { TimeBlockInput } from '@/db/timeBlocks';
 import { useCategories } from '@/hooks/useCategories';
 import { useNow } from '@/hooks/useNow';
+import { useSetting } from '@/hooks/useSettings';
 import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import { useLastTimeBlock, useTimeBlocksForDay } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, type } from '@/lib/colors';
@@ -75,8 +77,11 @@ export default function LogScreen() {
     return clampStart(minutes);
   }, [isToday, lastBlock, blocks, now, day]);
 
+  const [defaultDurationSetting] = useSetting('default_duration', '60');
+  const defaultDuration = clampDuration(Number(defaultDurationSetting) || 60);
+
   const [startMin, setStartMin] = useState(defaultStart);
-  const [durMin, setDurMin] = useState(60);
+  const [durMin, setDurMin] = useState(defaultDuration);
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
@@ -85,6 +90,7 @@ export default function LogScreen() {
   const [pendingEdit, setPendingEdit] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const allowSubmit = useSubmitGuard();
+  const toast = useToast();
 
   // Arriving from Your day: `date` says which day to write to, a tapped gap prefills
   // that stretch, and a tapped entry opens it for editing. Log is a tab, so it never
@@ -148,7 +154,7 @@ export default function LogScreen() {
   function resetForm(nextStart: number = defaultStart) {
     setEditingId(null);
     setStartMin(clampStart(nextStart));
-    setDurMin(60);
+    setDurMin(defaultDuration);
     setCategoryId(null);
     setNote('');
     setNoteOpen(false);
@@ -184,6 +190,7 @@ export default function LogScreen() {
         resetForm(startMin + durMin);
       }
       setNotice(null);
+      toast(editingId ? 'Entry updated.' : `Logged ${formatDuration(durMin)}.`);
     } catch (error) {
       console.error('save failed', error);
       setNotice("Couldn't save that — try again.");
@@ -209,10 +216,25 @@ export default function LogScreen() {
   }
 
   function handleDelete(id: number) {
+    const gone = blocks.find((b) => b.id === id);
     try {
       remove(id);
       if (editingId === id) resetForm();
       setNotice(null);
+      if (gone) {
+        toast('Entry deleted.', {
+          action: {
+            label: 'Undo',
+            onPress: () =>
+              add({
+                startTime: gone.startTime,
+                endTime: gone.endTime,
+                categoryId: gone.categoryId,
+                note: gone.note,
+              }),
+          },
+        });
+      }
     } catch (error) {
       console.error('delete failed', error);
       setNotice("Couldn't delete that — try again.");

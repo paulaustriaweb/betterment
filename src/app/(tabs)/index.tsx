@@ -21,6 +21,7 @@ import { AlertIcon, GearIcon, PlusIcon } from '@/components/icons';
 import { DisclosureRow, PrimaryButton, RangePills, ScreenHeader, Sheet, StatCard } from '@/components/ui';
 import { useCategories } from '@/hooks/useCategories';
 import { useNow } from '@/hooks/useNow';
+import { useSetting } from '@/hooks/useSettings';
 import { useTimeBlocksForRange } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, type } from '@/lib/colors';
 import { fitFontSize } from '@/lib/fit';
@@ -49,11 +50,13 @@ export default function OverviewScreen() {
   const [reminderOpen, setReminderOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
 
+  const [weekStartSetting] = useSetting('week_starts_on', '0');
+  const weekStartsOn = weekStartSetting === '1' ? 1 : 0;
   const categories = useCategories();
 
   const { rangeStart, rangeEnd } = useMemo(() => {
     if (range === 'week') {
-      const s = startOfWeek(now);
+      const s = startOfWeek(now, { weekStartsOn });
       return { rangeStart: s, rangeEnd: addWeeks(s, 1) };
     }
     if (range === 'month') {
@@ -62,7 +65,7 @@ export default function OverviewScreen() {
     }
     const s = startOfDay(now);
     return { rangeStart: s, rangeEnd: addDays(s, 1) };
-  }, [range, now]);
+  }, [range, now, weekStartsOn]);
 
   const blocks = useTimeBlocksForRange(rangeStart, rangeEnd);
 

@@ -12,6 +12,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 
 import { ErrorScreen } from '@/components/ErrorScreen';
+import { ToastProvider } from '@/components/Toast';
 import { initDb } from '@/db/init';
 import { DbVersionProvider } from '@/hooks/DbVersionContext';
 import { colors } from '@/lib/colors';
@@ -68,10 +69,12 @@ export default function RootLayout() {
         />
       ) : ready ? (
         <DbVersionProvider>
-          <StatusBar style="dark" />
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}>
-            <Stack.Screen name="(tabs)" />
-          </Stack>
+          <ToastProvider>
+            <StatusBar style="dark" />
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}>
+              <Stack.Screen name="(tabs)" />
+            </Stack>
+          </ToastProvider>
         </DbVersionProvider>
       ) : null}
     </>

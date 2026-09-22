@@ -1,4 +1,4 @@
-import { addDays, addMonths, format } from 'date-fns';
+import { addDays, addMonths, format, isSameDay, startOfDay } from 'date-fns';
 import * as Haptics from 'expo-haptics';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -6,112 +6,153 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { useNow } from '@/hooks/useNow';
 import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import { colors, font, radius } from '@/lib/colors';
+import type { Goal } from '@/lib/types';
 import { Banner } from './Banner';
+import { MonthCalendar } from './MonthCalendar';
 import { PrimaryButton, Sheet } from './ui';
 
 interface Props {
   visible: boolean;
+  /** Set to edit an existing goal; null adds a new one. */
+  editing: Goal | null;
+  weekStartsOn: 0 | 1;
   onClose: () => void;
-  onSave: (title: string, deadlineIso: string) => void;
+  onSave: (title: string, deadlineIso: string, id?: number) => void;
 }
 
-export function AddGoalSheet({ visible, onClose, onSave }: Props) {
+export function AddGoalSheet({ visible, editing, weekStartsOn, onClose, onSave }: Props) {
   const now = useNow();
   const [title, setTitle] = useState('');
-  const [offset, setOffset] = useState(30);
+  const [deadline, setDeadline] = useState(() => addMonths(startOfDay(now), 1));
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [failed, setFailed] = useState(false);
   const allowSubmit = useSubmitGuard();
 
-  // The sheet never unmounts, so reset on open — a title abandoned last time should
-  // not be sitting in the field the next time it's pulled up.
-  const [wasVisible, setWasVisible] = useState(visible);
-  if (visible !== wasVisible) {
-    setWasVisible(visible);
+  // The sheet never unmounts, so load during render. Keyed on open/closed as well as
+  // the row, so reopening starts from what is stored rather than from whatever was
+  // typed and abandoned last time.
+  const signature = `${visible}|${editing?.id ?? ''}`;
+  const [loaded, setLoaded] = useState(signature);
+  if (signature !== loaded) {
+    setLoaded(signature);
     if (visible) {
-      setTitle('');
-      setOffset(30);
+      setTitle(editing?.title ?? '');
+      setDeadline(editing ? startOfDay(new Date(editing.deadline)) : addMonths(startOfDay(now), 1));
+      setPickerOpen(false);
+      setFailed(false);
     }
   }
 
-  // Keyed on `now`, not [] — "a week" has to mean a week from today, not a week
-  // from whenever the app was last launched.
   const presets = useMemo(
     () => [
-      { label: 'A week', days: 7, date: addDays(now, 7) },
-      { label: 'A month', days: 30, date: addMonths(now, 1) },
-      { label: '3 months', days: 90, date: addMonths(now, 3) },
-      { label: '6 months', days: 180, date: addMonths(now, 6) },
+      { label: 'A week', date: addDays(startOfDay(now), 7) },
+      { label: 'A month', date: addMonths(startOfDay(now), 1) },
+      { label: '3 months', date: addMonths(startOfDay(now), 3) },
+      { label: '6 months', date: addMonths(startOfDay(now), 6) },
     ],
     [now]
   );
 
-  const deadline = presets.find((p) => p.days === offset)?.date ?? addDays(now, 30);
   const canSave = title.trim().length > 0;
 
   function save() {
     if (!canSave || !allowSubmit()) return;
     try {
-      onSave(title.trim(), deadline.toISOString());
+      onSave(title.trim(), deadline.toISOString(), editing?.id);
       setFailed(false);
-      setTitle('');
-      setOffset(30);
       onClose();
     } catch (error) {
-      // Without this the sheet just sat there doing nothing on a failed write.
       console.error('goal save failed', error);
       setFailed(true);
     }
   }
 
   return (
-    <Sheet visible={visible} title="Add goal" subtitle="One thing, one date" onClose={onClose}>
-      <Text style={styles.label}>What are you aiming at?</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Finish the portfolio site"
-        placeholderTextColor={colors.inkFaint}
-        value={title}
-        onChangeText={setTitle}
-        returnKeyType="done"
-        onSubmitEditing={save}
-      />
+    <Sheet
+      visible={visible}
+      title={editing ? 'Edit goal' : 'Add goal'}
+      subtitle="One thing, one date"
+      onClose={onClose}
+    >
+      <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
+        <Text style={styles.label}>What are you aiming at?</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Finish the portfolio site"
+          placeholderTextColor={colors.inkFaint}
+          value={title}
+          onChangeText={setTitle}
+          returnKeyType="done"
+          onSubmitEditing={save}
+        />
 
-      <Text style={[styles.label, { marginTop: 22 }]}>Deadline</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-        {presets.map((p) => {
-          const active = p.days === offset;
-          return (
-            <Pressable
-              key={p.days}
-              style={[styles.chip, { backgroundColor: active ? colors.rose : colors.ground }]}
-              onPress={() => {
-                Haptics.selectionAsync();
-                setOffset(p.days);
-              }}
-            >
-              <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{p.label}</Text>
-              <Text style={[styles.chipDate, active && styles.chipDateActive]}>{format(p.date, 'MMM d')}</Text>
-            </Pressable>
-          );
-        })}
+        <Text style={[styles.label, { marginTop: 22 }]}>Deadline</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+          {presets.map((p) => {
+            const active = isSameDay(p.date, deadline);
+            return (
+              <Pressable
+                key={p.label}
+                style={[styles.chip, { backgroundColor: active ? colors.rose : colors.ground }]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`${p.label}, ${format(p.date, 'MMMM d')}`}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setDeadline(p.date);
+                }}
+              >
+                <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{p.label}</Text>
+                <Text style={[styles.chipDate, active && styles.chipDateActive]}>{format(p.date, 'MMM d')}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <Pressable
+          style={styles.pickRow}
+          onPress={() => setPickerOpen(!pickerOpen)}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: pickerOpen }}
+          accessibilityLabel={`Pick an exact date. Currently ${format(deadline, 'EEEE, MMMM d')}`}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.pickLabel}>{pickerOpen ? 'Pick a date' : 'Or pick an exact date'}</Text>
+            <Text style={styles.pickValue}>{format(deadline, 'EEEE, MMMM d, yyyy')}</Text>
+          </View>
+          <Text style={styles.pickToggle}>{pickerOpen ? 'Done' : 'Calendar'}</Text>
+        </Pressable>
+
+        {pickerOpen ? (
+          <View style={styles.calendar}>
+            <MonthCalendar
+              value={deadline}
+              onChange={setDeadline}
+              minDate={startOfDay(now)}
+              weekStartsOn={weekStartsOn}
+            />
+          </View>
+        ) : null}
+
+        {failed ? (
+          <View style={styles.banner}>
+            <Banner message="Couldn't save that — try again." />
+          </View>
+        ) : null}
       </ScrollView>
 
-      <Text style={styles.summary}>Due {format(deadline, 'EEEE, MMMM d')}</Text>
-
-      {failed ? (
-        <View style={styles.banner}>
-          <Banner message="Couldn't save that — try again." />
-        </View>
-      ) : null}
-
-      <View style={canSave ? undefined : styles.disabled} pointerEvents={canSave ? 'auto' : 'none'}>
-        <PrimaryButton label={canSave ? 'Save goal' : 'Name it first'} onPress={save} />
+      <View style={[styles.action, !canSave && styles.disabled]} pointerEvents={canSave ? 'auto' : 'none'}>
+        <PrimaryButton
+          label={canSave ? (editing ? 'Save changes' : 'Save goal') : 'Name it first'}
+          onPress={save}
+        />
       </View>
     </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
+  scroll: { maxHeight: 400 },
   label: { fontFamily: font.regular, fontSize: 11.5, color: colors.inkSoft, marginTop: 20 },
   input: {
     fontFamily: font.semibold,
@@ -129,7 +170,21 @@ const styles = StyleSheet.create({
   chipDate: { fontFamily: font.regular, fontSize: 10.5, color: colors.inkSoft, marginTop: 2 },
   chipDateActive: { color: 'rgba(255,255,255,0.8)' },
 
-  summary: { fontFamily: font.medium, fontSize: 12.5, color: colors.roseDeep, marginTop: 10, marginBottom: 20 },
-  banner: { marginBottom: 16 },
+  pickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.ground,
+    borderRadius: 18,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  pickLabel: { fontFamily: font.regular, fontSize: 11, color: colors.inkSoft },
+  pickValue: { fontFamily: font.semibold, fontSize: 13.5, color: colors.ink, marginTop: 2 },
+  pickToggle: { fontFamily: font.semibold, fontSize: 12.5, color: colors.rose },
+
+  calendar: { marginTop: 10 },
+  banner: { marginTop: 14 },
+  action: { marginTop: 18, marginBottom: 4 },
   disabled: { opacity: 0.4 },
 });

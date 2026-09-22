@@ -17,6 +17,7 @@ import { AddTransactionSheet } from '@/components/AddTransactionSheet';
 import { Banner } from '@/components/Banner';
 import { Sparkline } from '@/components/Sparkline';
 import { SwipeRow } from '@/components/SwipeRow';
+import { useToast } from '@/components/Toast';
 import { MoneyIcon, PlusIcon } from '@/components/icons';
 import { DisclosureRow, PrimaryButton, RangePills, ScreenHeader, Sheet, StatCard } from '@/components/ui';
 import { moneyColor } from '@/constants/money';
@@ -44,6 +45,7 @@ export default function MoneyScreen() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [tab, setTab] = useState<'expense' | 'income'>('expense');
   const [notice, setNotice] = useState<string | null>(null);
+  const toast = useToast();
   const [currency] = useSetting('currency', 'PHP');
 
   const { rangeStart, rangeEnd } = useMemo(() => {
@@ -80,9 +82,26 @@ export default function MoneyScreen() {
   }, [transactions, rangeStart, rangeEnd, range]);
 
   function handleDelete(id: number) {
+    const gone = transactions.find((t) => t.id === id);
     try {
       remove(id);
       setNotice(null);
+      if (gone) {
+        toast(`Deleted ${transactionLabel(gone)}.`, {
+          action: {
+            label: 'Undo',
+            onPress: () =>
+              add({
+                type: gone.type,
+                amount: gone.amount,
+                category: gone.category,
+                source: gone.source,
+                note: gone.note,
+                date: gone.date,
+              }),
+          },
+        });
+      }
     } catch (error) {
       // An unhandled throw here left the row sitting there looking frozen.
       console.error('transaction delete failed', error);
@@ -234,7 +253,15 @@ export default function MoneyScreen() {
         currency={currency}
         editing={transactions.find((t) => t.id === editingId) ?? null}
         onClose={() => setAddOpen(false)}
-        onSubmit={(input, id) => (id ? update(id, input) : add(input))}
+        onSubmit={(input, id) => {
+          if (id) {
+            update(id, input);
+            toast('Transaction updated.');
+          } else {
+            add(input);
+            toast(`Added ${formatCurrency(input.amount, currency)}.`);
+          }
+        }}
       />
     </View>
   );
