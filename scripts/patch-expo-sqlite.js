@@ -67,8 +67,6 @@ const REPLACEMENTS = [
   },
 ];
 
-const ALREADY_PATCHED = 'const deadline = Date.now() + 5000;';
-
 function main() {
   if (!fs.existsSync(FILE)) {
     console.error(`[patch-expo-sqlite] ${FILE} not found — did the package layout change?`);
@@ -78,23 +76,29 @@ function main() {
   // Line endings are normalised so the match can't depend on how the file landed.
   const original = fs.readFileSync(FILE, 'utf8').replace(/\r\n/g, '\n');
 
-  if (original.includes(ALREADY_PATCHED)) {
-    console.log('[patch-expo-sqlite] already applied');
-    return;
-  }
-
+  // Each fix is checked on its own rather than against one "already done" marker.
+  // CI restores a cached node_modules, so the file can arrive with some of these
+  // applied and not others — a single marker failed the whole build on a copy that
+  // was half patched by the previous release.
   let patched = original;
+  let applied = 0;
+  let skipped = 0;
   for (const { name, find, replace } of REPLACEMENTS) {
+    if (patched.includes(replace)) {
+      skipped += 1;
+      continue;
+    }
     if (!patched.includes(find)) {
       console.error(`[patch-expo-sqlite] could not find: ${name}`);
       console.error('[patch-expo-sqlite] expo-sqlite has changed. Re-check the bugs this fixes.');
       process.exit(1);
     }
     patched = patched.replace(find, replace);
+    applied += 1;
   }
 
-  fs.writeFileSync(FILE, patched, 'utf8');
-  console.log('[patch-expo-sqlite] applied 3 fixes to expo-sqlite web worker');
+  if (patched !== original) fs.writeFileSync(FILE, patched, 'utf8');
+  console.log(`[patch-expo-sqlite] ${applied} applied, ${skipped} already present`);
 }
 
 main();
