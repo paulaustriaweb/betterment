@@ -9,6 +9,7 @@ import {
   updateTimeBlock,
   type TimeBlockInput,
 } from '@/db/timeBlocks';
+import { safeRead } from '@/db/safeRead';
 import type { TimeBlock } from '@/lib/types';
 import { useDbVersion } from './DbVersionContext';
 
@@ -24,7 +25,7 @@ export function useTimeBlocksForDay(day: Date) {
   const blocks = useMemo(() => {
     const rangeStart = startOfDay(day).toISOString();
     const rangeEnd = endOfDay(day).toISOString();
-    return listTimeBlocksForRange(rangeStart, rangeEnd);
+    return safeRead(`day:${rangeStart}`, () => listTimeBlocksForRange(rangeStart, rangeEnd), [] as TimeBlock[]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day, version]);
 
@@ -68,12 +69,15 @@ export function useTimeBlocksForRange(rangeStart: Date, rangeEnd: Date): TimeBlo
   const { version } = useDbVersion();
   const startIso = rangeStart.toISOString();
   const endIso = rangeEnd.toISOString();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemo(() => listTimeBlocksForRange(startIso, endIso), [startIso, endIso, version]);
+  return useMemo(
+    () => safeRead(`range:${startIso}:${endIso}`, () => listTimeBlocksForRange(startIso, endIso), [] as TimeBlock[]),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [startIso, endIso, version]
+  );
 }
 
 export function useLastTimeBlock(): TimeBlock | null {
   const { version } = useDbVersion();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemo(() => getLastTimeBlock(), [version]);
+  return useMemo(() => safeRead('lastBlock', getLastTimeBlock, null as TimeBlock | null), [version]);
 }

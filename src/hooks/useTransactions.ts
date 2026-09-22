@@ -8,14 +8,19 @@ import {
   type TransactionInput,
 } from '@/db/transactions';
 import { useDbVersion } from './DbVersionContext';
+import { safeRead } from '@/db/safeRead';
+import type { Transaction } from '@/lib/types';
 
 export function useTransactionsForRange(rangeStart: Date, rangeEnd: Date) {
   const { version, bump } = useDbVersion();
   const startIso = rangeStart.toISOString();
   const endIso = rangeEnd.toISOString();
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const transactions = useMemo(() => listTransactionsForRange(startIso, endIso), [startIso, endIso, version]);
+  const transactions = useMemo(
+    () => safeRead(`tx:${startIso}:${endIso}`, () => listTransactionsForRange(startIso, endIso), [] as Transaction[]),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [startIso, endIso, version]
+  );
 
   const add = useCallback(
     (input: TransactionInput) => {
