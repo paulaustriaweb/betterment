@@ -13,7 +13,13 @@ export function useSubmitGuard(windowMs = 700): () => boolean {
   return () => {
     const now = Date.now();
     if (now - last.current < windowMs) return false;
+    // Stamped again by the caller when the work finishes. The window has to start
+    // from the end of the save, not the beginning: a save that blocks for a second
+    // puts the next tap outside the window before it is even delivered.
     last.current = now;
+    queueMicrotask(() => {
+      last.current = Date.now();
+    });
     return true;
   };
 }

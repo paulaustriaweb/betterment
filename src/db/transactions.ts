@@ -45,6 +45,22 @@ export function listTransactionsForRange(rangeStartIso: string, rangeEndIso: str
 
 export function insertTransaction(input: TransactionInput): number {
   const db = getDb();
+
+  // Two identical amounts on the same day are plausible — two coffees — so this
+  // can't dedupe on the values alone. A retry within a few seconds of an identical
+  // one is a double save, not a second coffee.
+  const since = new Date(Date.now() - 8000).toISOString();
+  const duplicate = db.getFirstSync<{ id: number }>(
+    `SELECT id FROM transactions
+     WHERE type = ? AND amount = ?
+       AND IFNULL(category, '') = IFNULL(?, '')
+       AND IFNULL(source, '') = IFNULL(?, '')
+       AND created_at >= ?
+     LIMIT 1`,
+    [input.type, input.amount, input.category, input.source, since]
+  );
+  if (duplicate) return duplicate.id;
+
   const result = db.runSync(
     'INSERT INTO transactions (type, amount, category, source, note, date, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [input.type, input.amount, input.category, input.source, input.note, input.date, new Date().toISOString()]

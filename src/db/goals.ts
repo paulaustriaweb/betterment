@@ -26,6 +26,14 @@ export function listGoals(): Goal[] {
 
 export function insertGoal(title: string, deadlineIso: string): number {
   const db = getDb();
+
+  // The same thing due on the same day is one goal.
+  const duplicate = db.getFirstSync<{ id: number }>(
+    'SELECT id FROM goals WHERE title = ? AND deadline = ? AND is_complete = 0 LIMIT 1',
+    [title, deadlineIso]
+  );
+  if (duplicate) return duplicate.id;
+
   const result = db.runSync('INSERT INTO goals (title, deadline, is_complete, created_at) VALUES (?, ?, 0, ?)', [
     title,
     deadlineIso,

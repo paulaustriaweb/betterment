@@ -45,6 +45,17 @@ export interface TimeBlockInput {
 
 export function insertTimeBlock(input: TimeBlockInput): number {
   const db = getDb();
+
+  // The same category over the exact same minutes is one entry, never two, so a
+  // repeated save returns what is already there rather than adding a copy. The
+  // debounce upstairs only covers fast double-taps; this covers a deliberate
+  // retry after a save that looked like it failed but had already written.
+  const duplicate = db.getFirstSync<{ id: number }>(
+    'SELECT id FROM time_blocks WHERE start_time = ? AND end_time = ? AND category_id = ? LIMIT 1',
+    [input.startTime, input.endTime, input.categoryId]
+  );
+  if (duplicate) return duplicate.id;
+
   const now = new Date().toISOString();
   const result = db.runSync(
     'INSERT INTO time_blocks (start_time, end_time, category_id, note, created_at) VALUES (?, ?, ?, ?, ?)',
