@@ -116,6 +116,9 @@ export default function LogScreen() {
 
   const startDate = addMinutes(day, startMin);
   const endDate = addMinutes(day, startMin + durMin);
+  // Sleep normally crosses midnight, so this is allowed — but "Ends 3:45 AM" with
+  // nothing else said reads as this morning, which is the wrong day entirely.
+  const endsNextDay = startMin + durMin > MINUTES_PER_DAY;
 
   const overlap = useMemo(
     () => detectOverlap(blocks, startDate, endDate, editingId ?? undefined),
@@ -187,8 +190,14 @@ export default function LogScreen() {
   function startEditing(block: TimeBlock) {
     const s = new Date(block.startTime);
     const e = new Date(block.endTime);
+    // Offsets are measured from the entry's own day, not whichever day is on screen.
+    // One that crosses midnight is listed under both, and measuring it against the
+    // later day gives a negative start that clamps to midnight — saving would then
+    // move the entry and silently rewrite when it happened.
+    const blockDay = startOfDay(s);
+    setDay(blockDay);
     setEditingId(block.id);
-    setStartMin(clampStart(differenceInMinutes(s, day)));
+    setStartMin(clampStart(differenceInMinutes(s, blockDay)));
     setDurMin(Math.max(STEP, differenceInMinutes(e, s)));
     setCategoryId(block.categoryId);
     setNote(block.note ?? '');
@@ -282,7 +291,7 @@ export default function LogScreen() {
               <Text style={styles.fieldValue}>{format(startDate, 'h:mm a')}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.fieldLabel}>Ends</Text>
+              <Text style={styles.fieldLabel}>Ends{endsNextDay ? ' (next day)' : ''}</Text>
               <Text style={styles.fieldValue}>{format(endDate, 'h:mm a')}</Text>
             </View>
             {isToday ? (

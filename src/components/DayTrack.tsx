@@ -118,27 +118,38 @@ export function DayTrack({ startMin, durMin, existing, onChange }: Props) {
   /* eslint-enable react-hooks/refs */
 
   const pxPerMinute = width / MINUTES_PER_DAY;
-  const blockLeft = startMin * pxPerMinute;
-  const blockWidth = Math.max(HANDLE_WIDTH + 4, durMin * pxPerMinute);
+  const blockLeft = clamp(startMin, 0, MINUTES_PER_DAY) * pxPerMinute;
+  // An entry may legitimately run past midnight — sleep usually does — so the bar
+  // is drawn only as far as this day goes. Without the clamp the block renders
+  // wider than the track and spills out of the card.
+  const drawnMinutes = clamp(startMin + durMin, 0, MINUTES_PER_DAY) - clamp(startMin, 0, MINUTES_PER_DAY);
+  const blockWidth = Math.max(HANDLE_WIDTH + 4, drawnMinutes * pxPerMinute);
 
   return (
     <View>
       <View style={styles.track} onLayout={onLayout}>
         {width > 0 ? (
           <>
-            {existing.map((b) => (
-              <View
-                key={`${b.start}-${b.end}`}
-                style={[
-                  styles.existing,
-                  {
-                    left: b.start * pxPerMinute,
-                    width: Math.max(2, (b.end - b.start) * pxPerMinute),
-                    backgroundColor: b.color,
-                  },
-                ]}
-              />
-            ))}
+            {existing.map((b) => {
+              // Entries either side of midnight reach outside this day; show the slice
+              // that belongs to it.
+              const from = clamp(b.start, 0, MINUTES_PER_DAY);
+              const to = clamp(b.end, 0, MINUTES_PER_DAY);
+              if (to <= from) return null;
+              return (
+                <View
+                  key={`${b.start}-${b.end}`}
+                  style={[
+                    styles.existing,
+                    {
+                      left: from * pxPerMinute,
+                      width: Math.max(2, (to - from) * pxPerMinute),
+                      backgroundColor: b.color,
+                    },
+                  ]}
+                />
+              );
+            })}
 
             {[6, 12, 18].map((h) => (
               <View key={h} style={[styles.tick, { left: h * 60 * pxPerMinute }]} />

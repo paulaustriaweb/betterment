@@ -12,6 +12,7 @@ import { findGaps, formatDuration } from '@/lib/time';
 
 const HOUR_HEIGHT = 62;
 const GUTTER = 54;
+const MINUTES_PER_DAY = 24 * 60;
 const DAY_HEIGHT = HOUR_HEIGHT * 24;
 /** Below this, a block is too short to hold two lines of text. */
 const COMPACT_BLOCK = 44;
@@ -120,8 +121,11 @@ export default function AgendaScreen() {
         })}
 
         {blocks.map((b) => {
-          const start = differenceInMinutes(new Date(b.startTime), selected);
-          const end = differenceInMinutes(new Date(b.endTime), selected);
+          // An entry that crosses midnight shows on both days; draw only the part
+          // that belongs to this one, or it runs off the top or bottom of the timeline.
+          const start = Math.max(0, differenceInMinutes(new Date(b.startTime), selected));
+          const end = Math.min(MINUTES_PER_DAY, differenceInMinutes(new Date(b.endTime), selected));
+          if (end <= start) return null;
           const height = ((end - start) / 60) * HOUR_HEIGHT;
           const category = categories.find((c) => c.id === b.categoryId);
           const tint = tintFor(category?.color ?? '');
