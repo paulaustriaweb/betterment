@@ -387,14 +387,26 @@ Tests cover `lib/` only — the date arithmetic, gap detection, money sums, goal
 currency validation. There are no component tests; the UI was checked by using it.
 
 ### Conventions a new session must not undo
-- **`patches/expo-sqlite+57.0.3.patch` is load-bearing. Do not delete it, and keep the
-  `postinstall: patch-package` script.** expo-sqlite 57's web worker writes the length
-  header of a sync result with `Uint8Array.set(new Uint32Array([length]))`, which converts
-  element-wise and writes a *single byte* — so every sync result of 256 bytes or more came
-  back truncated to `length % 256` and blew up as `JSON Parse error`. Reads are row-at-a-time,
-  which is why it only surfaced once a single row grew past 256 bytes. The patch writes and
-  reads the header with a `DataView`. Re-check this on any expo-sqlite upgrade; if upstream
-  has fixed it, drop the patch rather than carrying it forward.
+- **`scripts/patch-expo-sqlite.js` is load-bearing. Do not delete it, and keep the
+  `postinstall` hook that runs it.** It fixes two bugs in expo-sqlite 57's web sync bridge,
+  both of which shipped and both of which were reported from real use:
+  1. The length header of a sync result was written with
+     `Uint8Array.set(new Uint32Array([length]))`, which converts element-wise and writes a
+     *single byte*, so any result of 256 bytes or more came back truncated to `length % 256`
+     and blew up as `JSON Parse error`. Reads step one row at a time, which is why it stayed
+     hidden until a single row grew past 256 bytes.
+  2. The wait for the worker was budgeted at 1,000,000 `Atomics.pause()` calls — roughly
+     20-40ms. An OPFS flush on a phone takes longer, so writes threw `Sync operation timeout`
+     *after* the worker had already committed them. The budget is wall-clock now.
+
+  It is a string replacement rather than a `.patch` on purpose: patch-package matched
+  context, which worked locally and failed on Netlify's Linux runner, breaking every deploy
+  for hours while the fixes sat in `main` looking shipped. Exact replacement behaves the same
+  everywhere and exits loudly naming what it could not find. Re-check both bugs on any
+  expo-sqlite upgrade; if upstream has fixed them, delete the script rather than carry it.
+- **Check what is actually deployed before trusting a fix.** Fingerprint the served bundle
+  for a string unique to the commit — `fetch('/')`, pull the `entry-*.js` URL out of the HTML,
+  fetch it and grep. Pushed is not deployed.
 - **Spans are merged before summing** in `lib/time.ts`. Overlapping blocks are allowed by
   design, so naive summing double-counts minutes and can report negative unaccounted time.
 - **Two React Compiler lint rules bite repeatedly.** `react-hooks/set-state-in-effect`:
