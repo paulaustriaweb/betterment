@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useNow } from '@/hooks/useNow';
+import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import { colors, font, radius } from '@/lib/colors';
 import { Banner } from './Banner';
 import { PrimaryButton, Sheet } from './ui';
@@ -19,6 +20,7 @@ export function AddGoalSheet({ visible, onClose, onSave }: Props) {
   const [title, setTitle] = useState('');
   const [offset, setOffset] = useState(30);
   const [failed, setFailed] = useState(false);
+  const allowSubmit = useSubmitGuard();
 
   // The sheet never unmounts, so reset on open — a title abandoned last time should
   // not be sitting in the field the next time it's pulled up.
@@ -47,7 +49,7 @@ export function AddGoalSheet({ visible, onClose, onSave }: Props) {
   const canSave = title.trim().length > 0;
 
   function save() {
-    if (!canSave) return;
+    if (!canSave || !allowSubmit()) return;
     try {
       onSave(title.trim(), deadline.toISOString());
       setFailed(false);

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { EXPENSE_CATEGORIES, INCOME_SOURCES } from '@/constants/money';
+import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import type { TransactionInput } from '@/db/transactions';
 import { colors, font, radius } from '@/lib/colors';
 import { formatCurrency } from '@/lib/currency';
@@ -27,6 +28,7 @@ export function AddTransactionSheet({ visible, currency, editing, onClose, onSub
   const [amount, setAmount] = useState('0');
   const [label, setLabel] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const allowSubmit = useSubmitGuard();
 
   // The sheet stays mounted, so load during render rather than syncing in an effect.
   // Keyed on `visible` as well as the row: opening the same row twice, or opening a
@@ -54,7 +56,7 @@ export function AddTransactionSheet({ visible, currency, editing, onClose, onSub
   }
 
   function save() {
-    if (!canSave) return;
+    if (!canSave || !allowSubmit()) return;
     try {
       onSubmit(
         {

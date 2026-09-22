@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { LayoutAnimation, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AddGoalSheet } from '@/components/AddGoalSheet';
+import { Banner } from '@/components/Banner';
 import { CheckIcon, GoalsIcon, PlusIcon } from '@/components/icons';
 import { SwipeRow } from '@/components/SwipeRow';
 import { DisclosureRow, PrimaryButton, ScreenHeader, Sheet } from '@/components/ui';
@@ -17,6 +18,7 @@ export default function GoalsScreen() {
   const { goals, add, setComplete, remove } = useGoals();
   const [doneOpen, setDoneOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const active = useMemo(() => sortByDeadline(goals.filter((g) => !g.isComplete)), [goals]);
   const completed = useMemo(() => goals.filter((g) => g.isComplete), [goals]);
@@ -32,6 +34,17 @@ export default function GoalsScreen() {
     );
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setComplete(id, complete);
+  }
+
+  function handleDelete(id: number) {
+    try {
+      remove(id);
+      setNotice(null);
+    } catch (error) {
+      // An unhandled throw here left the row sitting there looking frozen.
+      console.error('goal delete failed', error);
+      setNotice("Couldn't delete that — try again.");
+    }
   }
 
   const nextDays = next ? daysUntil(next.deadline, now) : 0;
@@ -133,12 +146,18 @@ export default function GoalsScreen() {
         subtitle="Tap one to bring it back"
         onClose={() => setDoneOpen(false)}
       >
+        {notice ? (
+          <View style={styles.banner}>
+            <Banner message={notice} />
+          </View>
+        ) : null}
+
         {completed.length === 0 ? (
           <Text style={styles.empty}>Nothing finished yet.</Text>
         ) : (
           <ScrollView style={styles.doneScroll}>
             {completed.map((g) => (
-              <SwipeRow key={g.id} onDelete={() => remove(g.id)}>
+              <SwipeRow key={g.id} onDelete={() => handleDelete(g.id)}>
                 <Pressable
                   style={({ pressed }) => [styles.doneRow, pressed && styles.rowPressed]}
                   onPress={() => toggle(g.id, false)}
@@ -229,6 +248,7 @@ const styles = StyleSheet.create({
   },
   doneTitle: { flex: 1, fontFamily: font.regular, fontSize: 13, color: colors.inkFaint, textDecorationLine: 'line-through' },
 
+  banner: { marginTop: 12 },
   empty: { fontFamily: font.regular, fontSize: 13, color: colors.inkSoft, paddingVertical: 24 },
   hint: { fontFamily: font.regular, fontSize: 11, color: colors.inkFaint, paddingVertical: 14 },
 });

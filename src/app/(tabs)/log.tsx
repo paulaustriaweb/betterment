@@ -13,6 +13,7 @@ import { Card, DisclosureRow, PrimaryButton, ScreenHeader, Sheet, Stepper } from
 import type { TimeBlockInput } from '@/db/timeBlocks';
 import { useCategories } from '@/hooks/useCategories';
 import { useNow } from '@/hooks/useNow';
+import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import { useLastTimeBlock, useTimeBlocksForDay } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, type } from '@/lib/colors';
 import { fitFontSize } from '@/lib/fit';
@@ -83,6 +84,7 @@ export default function LogScreen() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [pendingEdit, setPendingEdit] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const allowSubmit = useSubmitGuard();
 
   // Arriving from Your day: `date` says which day to write to, a tapped gap prefills
   // that stretch, and a tapped entry opens it for editing. Log is a tab, so it never
@@ -160,6 +162,7 @@ export default function LogScreen() {
   }
 
   function handleSave() {
+    if (!allowSubmit()) return;
     if (!categoryId) {
       setNotice('Pick a category first — what were you doing?');
       return;

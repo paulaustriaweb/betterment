@@ -14,6 +14,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AddTransactionSheet } from '@/components/AddTransactionSheet';
+import { Banner } from '@/components/Banner';
 import { Sparkline } from '@/components/Sparkline';
 import { SwipeRow } from '@/components/SwipeRow';
 import { MoneyIcon, PlusIcon } from '@/components/icons';
@@ -42,6 +43,7 @@ export default function MoneyScreen() {
   // taken before the last save.
   const [editingId, setEditingId] = useState<number | null>(null);
   const [tab, setTab] = useState<'expense' | 'income'>('expense');
+  const [notice, setNotice] = useState<string | null>(null);
   const [currency] = useSetting('currency', 'PHP');
 
   const { rangeStart, rangeEnd } = useMemo(() => {
@@ -76,6 +78,17 @@ export default function MoneyScreen() {
     });
     return cumulative(perBucket);
   }, [transactions, rangeStart, rangeEnd, range]);
+
+  function handleDelete(id: number) {
+    try {
+      remove(id);
+      setNotice(null);
+    } catch (error) {
+      // An unhandled throw here left the row sitting there looking frozen.
+      console.error('transaction delete failed', error);
+      setNotice("Couldn't delete that — try again.");
+    }
+  }
 
   const rows = transactions.filter((t) => t.type === tab);
   const rangeLabel = RANGES.find((r) => r.key === range)?.label ?? 'This month';
@@ -172,6 +185,12 @@ export default function MoneyScreen() {
           })}
         </View>
 
+        {notice ? (
+          <View style={styles.banner}>
+            <Banner message={notice} />
+          </View>
+        ) : null}
+
         {rows.length === 0 ? (
           <Text style={styles.empty}>Nothing here yet.</Text>
         ) : (
@@ -179,7 +198,7 @@ export default function MoneyScreen() {
             {rows.map((t) => {
               const label = transactionLabel(t);
               return (
-                <SwipeRow key={t.id} onDelete={() => remove(t.id)}>
+                <SwipeRow key={t.id} onDelete={() => handleDelete(t.id)}>
                   <Pressable
                     style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
                     onPress={() => {
@@ -272,6 +291,7 @@ const styles = StyleSheet.create({
   rowAmount: { fontFamily: font.bold, fontSize: 13.5, color: colors.ink, fontVariant: ['tabular-nums'] },
   rowAmountIn: { color: '#256247' },
 
+  banner: { marginTop: 12 },
   empty: { fontFamily: font.regular, fontSize: 13, color: colors.inkSoft, paddingVertical: 24 },
   hint: { fontFamily: font.regular, fontSize: 11, color: colors.inkFaint, paddingVertical: 14 },
 });
