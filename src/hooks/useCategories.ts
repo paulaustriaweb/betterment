@@ -17,16 +17,22 @@ export function useCategoryEdits() {
 
   const rename = useCallback(
     (id: number, name: string) => {
-      renameCategory(id, name);
-      bump();
+      try {
+        renameCategory(id, name);
+      } finally {
+        bump();
+      }
     },
     [bump]
   );
 
   const setActive = useCallback(
     (id: number, active: boolean) => {
-      setCategoryActive(id, active);
-      bump();
+      try {
+        setCategoryActive(id, active);
+      } finally {
+        bump();
+      }
     },
     [bump]
   );

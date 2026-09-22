@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 
 import { useNow } from '@/hooks/useNow';
 import { colors, font, radius } from '@/lib/colors';
+import { Banner } from './Banner';
 import { PrimaryButton, Sheet } from './ui';
 
 interface Props {
@@ -17,6 +18,7 @@ export function AddGoalSheet({ visible, onClose, onSave }: Props) {
   const now = useNow();
   const [title, setTitle] = useState('');
   const [offset, setOffset] = useState(30);
+  const [failed, setFailed] = useState(false);
 
   // The sheet never unmounts, so reset on open — a title abandoned last time should
   // not be sitting in the field the next time it's pulled up.
@@ -46,10 +48,17 @@ export function AddGoalSheet({ visible, onClose, onSave }: Props) {
 
   function save() {
     if (!canSave) return;
-    onSave(title.trim(), deadline.toISOString());
-    setTitle('');
-    setOffset(30);
-    onClose();
+    try {
+      onSave(title.trim(), deadline.toISOString());
+      setFailed(false);
+      setTitle('');
+      setOffset(30);
+      onClose();
+    } catch (error) {
+      // Without this the sheet just sat there doing nothing on a failed write.
+      console.error('goal save failed', error);
+      setFailed(true);
+    }
   }
 
   return (
@@ -87,6 +96,12 @@ export function AddGoalSheet({ visible, onClose, onSave }: Props) {
 
       <Text style={styles.summary}>Due {format(deadline, 'EEEE, MMMM d')}</Text>
 
+      {failed ? (
+        <View style={styles.banner}>
+          <Banner message="Couldn't save that — try again." />
+        </View>
+      ) : null}
+
       <View style={canSave ? undefined : styles.disabled} pointerEvents={canSave ? 'auto' : 'none'}>
         <PrimaryButton label={canSave ? 'Save goal' : 'Name it first'} onPress={save} />
       </View>
@@ -113,5 +128,6 @@ const styles = StyleSheet.create({
   chipDateActive: { color: 'rgba(255,255,255,0.8)' },
 
   summary: { fontFamily: font.medium, fontSize: 12.5, color: colors.roseDeep, marginTop: 10, marginBottom: 20 },
+  banner: { marginBottom: 16 },
   disabled: { opacity: 0.4 },
 });

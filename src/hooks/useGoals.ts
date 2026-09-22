@@ -11,25 +11,33 @@ export function useGoals() {
 
   const add = useCallback(
     (title: string, deadlineIso: string) => {
-      const id = insertGoal(title, deadlineIso);
-      bump();
-      return id;
+      try {
+        return insertGoal(title, deadlineIso);
+      } finally {
+        bump();
+      }
     },
     [bump]
   );
 
   const setComplete = useCallback(
     (id: number, complete: boolean) => {
-      setGoalComplete(id, complete);
-      bump();
+      try {
+        setGoalComplete(id, complete);
+      } finally {
+        bump();
+      }
     },
     [bump]
   );
 
   const remove = useCallback(
     (id: number) => {
-      deleteGoal(id);
-      bump();
+      try {
+        deleteGoal(id);
+      } finally {
+        bump();
+      }
     },
     [bump]
   );

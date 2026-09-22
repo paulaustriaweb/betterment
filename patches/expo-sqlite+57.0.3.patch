@@ -1,5 +1,5 @@
 diff --git a/node_modules/expo-sqlite/web/WorkerChannel.ts b/node_modules/expo-sqlite/web/WorkerChannel.ts
-index 7fba380..0396e1c 100644
+index 7fba380..46d11f8 100644
 --- a/node_modules/expo-sqlite/web/WorkerChannel.ts
 +++ b/node_modules/expo-sqlite/web/WorkerChannel.ts
 @@ -40,7 +40,10 @@ export function sendWorkerResult({
@@ -14,7 +14,34 @@ index 7fba380..0396e1c 100644
      resultArray.set(resultBytes, 4);
      Atomics.store(lock, 0, RESOLVED);
    } else {
-@@ -137,7 +140,7 @@ export function invokeWorkerSync<T extends SQLiteWorkerMessageType & keyof Resul
+@@ -119,25 +122,24 @@ export function invokeWorkerSync<T extends SQLiteWorkerMessageType & keyof Resul
+   let i = 0;
+   // @ts-expect-error: Remove this when TypeScript supports Atomics.pause
+   const useAtomicsPause = typeof Atomics.pause === 'function';
++  // Budget the wait in wall-clock time rather than iterations. A million
++  // Atomics.pause() calls is only ~20-40ms, and an OPFS flush on a phone routinely
++  // takes longer than that — so writes threw "Sync operation timeout" after the
++  // worker had already committed them, leaving the UI stale and the row on disk.
++  const deadline = Date.now() + 5000;
+   while (Atomics.load(lock, 0) === PENDING) {
+-    ++i;
++    // Reading the clock every iteration would cost more than the pause itself.
++    if ((++i & 0xffff) === 0 && Date.now() > deadline) {
++      throw new Error('Sync operation timeout');
++    }
+ 
+     if (useAtomicsPause) {
+-      if (i > 1_000_000) {
+-        throw new Error('Sync operation timeout');
+-      }
+       // @ts-expect-error: Remove this when TypeScript supports Atomics.pause
+       Atomics.pause();
+-    } else {
+-      // NOTE(kudo): Unfortunate for the busy loop,
+-      // because we don't have a way for main thread to yield its execution to other callbacks.
+-      if (i > 1000_000_000) {
+-        throw new Error('Sync operation timeout');
+-      }
      }
    }
  

@@ -19,25 +19,33 @@ export function useTransactionsForRange(rangeStart: Date, rangeEnd: Date) {
 
   const add = useCallback(
     (input: TransactionInput) => {
-      const id = insertTransaction(input);
-      bump();
-      return id;
+      try {
+        return insertTransaction(input);
+      } finally {
+        bump();
+      }
     },
     [bump]
   );
 
   const update = useCallback(
     (id: number, input: TransactionInput) => {
-      updateTransaction(id, input);
-      bump();
+      try {
+        updateTransaction(id, input);
+      } finally {
+        bump();
+      }
     },
     [bump]
   );
 
   const remove = useCallback(
     (id: number) => {
-      deleteTransaction(id);
-      bump();
+      try {
+        deleteTransaction(id);
+      } finally {
+        bump();
+      }
     },
     [bump]
   );

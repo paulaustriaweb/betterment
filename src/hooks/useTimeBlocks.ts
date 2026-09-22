@@ -30,25 +30,33 @@ export function useTimeBlocksForDay(day: Date) {
 
   const add = useCallback(
     (input: TimeBlockInput) => {
-      const id = insertTimeBlock(input);
-      bump();
-      return id;
+      try {
+        return insertTimeBlock(input);
+      } finally {
+        bump();
+      }
     },
     [bump]
   );
 
   const update = useCallback(
     (id: number, input: TimeBlockInput) => {
-      updateTimeBlock(id, input);
-      bump();
+      try {
+        updateTimeBlock(id, input);
+      } finally {
+        bump();
+      }
     },
     [bump]
   );
 
   const remove = useCallback(
     (id: number) => {
-      deleteTimeBlock(id);
-      bump();
+      try {
+        deleteTimeBlock(id);
+      } finally {
+        bump();
+      }
     },
     [bump]
   );

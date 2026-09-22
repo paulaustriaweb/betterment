@@ -10,6 +10,7 @@ import { fitFontSize } from '@/lib/fit';
 import { transactionLabel } from '@/lib/money';
 import type { Transaction } from '@/lib/types';
 import { AmountPad } from './AmountPad';
+import { Banner } from './Banner';
 import { PrimaryButton, Sheet } from './ui';
 
 interface Props {
@@ -25,6 +26,7 @@ export function AddTransactionSheet({ visible, currency, editing, onClose, onSub
   const [type, setType] = useState<'expense' | 'income'>('expense');
   const [amount, setAmount] = useState('0');
   const [label, setLabel] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   // The sheet stays mounted, so load during render rather than syncing in an effect.
   // Keyed on `visible` as well as the row: opening the same row twice, or opening a
@@ -53,18 +55,25 @@ export function AddTransactionSheet({ visible, currency, editing, onClose, onSub
 
   function save() {
     if (!canSave) return;
-    onSubmit(
-      {
-        type,
-        amount: parsed,
-        category: type === 'expense' ? label : null,
-        source: type === 'income' ? label : null,
-        note: editing?.note ?? null,
-        date: editing?.date ?? new Date().toISOString(),
-      },
-      editing?.id
-    );
-    onClose();
+    try {
+      onSubmit(
+        {
+          type,
+          amount: parsed,
+          category: type === 'expense' ? label : null,
+          source: type === 'income' ? label : null,
+          note: editing?.note ?? null,
+          date: editing?.date ?? new Date().toISOString(),
+        },
+        editing?.id
+      );
+      setFailed(false);
+      onClose();
+    } catch (error) {
+      // Without this the sheet just sat there doing nothing on a failed write.
+      console.error('transaction save failed', error);
+      setFailed(true);
+    }
   }
 
   return (
@@ -130,6 +139,12 @@ export function AddTransactionSheet({ visible, currency, editing, onClose, onSub
         })}
       </ScrollView>
 
+      {failed ? (
+        <View style={styles.banner}>
+          <Banner message="Couldn't save that — check it's still right, then try again." />
+        </View>
+      ) : null}
+
       <AmountPad value={amount} onChange={setAmount} />
 
       <View style={canSave ? undefined : styles.disabled} pointerEvents={canSave ? 'auto' : 'none'}>
@@ -160,5 +175,6 @@ const styles = StyleSheet.create({
   chipLabel: { fontFamily: font.medium, fontSize: 12.5, color: colors.ink },
   chipLabelActive: { fontFamily: font.semibold, color: colors.surface },
 
+  banner: { marginTop: 4 },
   disabled: { opacity: 0.4 },
 });

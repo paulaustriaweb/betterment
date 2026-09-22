@@ -10,8 +10,11 @@ export function useSetting(key: string, fallback: string): [string, (value: stri
 
   const set = useCallback(
     (next: string) => {
-      setSetting(key, next);
-      bump();
+      try {
+        setSetting(key, next);
+      } finally {
+        bump();
+      }
     },
     [key, bump]
   );
