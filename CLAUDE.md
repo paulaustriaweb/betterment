@@ -382,28 +382,23 @@ build been opened on an actual iPhone yet — that is the one remaining check th
 because iOS Safari is the shipping platform and it is the browser least like the one it was
 tested in.
 
-`tsc`, `expo lint`, 53 Jest tests and `expo export` for both ios and web are all clean.
+`tsc`, `expo lint`, 74 Jest tests and `expo export --platform web` are all clean.
 Tests cover `lib/` only — the date arithmetic, gap detection, money sums, goal countdowns,
-currency validation. There are no component tests; the UI was checked by using it.
+currency validation, backup-file validation. There are no component tests; the UI was checked by using it.
 
 ### Conventions a new session must not undo
-- **`scripts/patch-expo-sqlite.js` is load-bearing. Do not delete it, and keep the
-  `postinstall` hook that runs it.** It fixes two bugs in expo-sqlite 57's web sync bridge,
-  both of which shipped and both of which were reported from real use:
-  1. The length header of a sync result was written with
-     `Uint8Array.set(new Uint32Array([length]))`, which converts element-wise and writes a
-     *single byte*, so any result of 256 bytes or more came back truncated to `length % 256`
-     and blew up as `JSON Parse error`. Reads step one row at a time, which is why it stayed
-     hidden until a single row grew past 256 bytes.
-  2. The wait for the worker was budgeted at 1,000,000 `Atomics.pause()` calls — roughly
-     20-40ms. An OPFS flush on a phone takes longer, so writes threw `Sync operation timeout`
-     *after* the worker had already committed them. The budget is wall-clock now.
-
-  It is a string replacement rather than a `.patch` on purpose: patch-package matched
-  context, which worked locally and failed on Netlify's Linux runner, breaking every deploy
-  for hours while the fixes sat in `main` looking shipped. Exact replacement behaves the same
-  everywhere and exits loudly naming what it could not find. Re-check both bugs on any
-  expo-sqlite upgrade; if upstream has fixed them, delete the script rather than carry it.
+- **Every database call is async** (2026-09-24). expo-sqlite's sync API on web busy-spins
+  the main thread on an `Atomics` lock while a worker answers; that one design caused the
+  save timeouts, the dead buttons, the duplicates and the all-tabs freeze. Never add a
+  `*Sync` call back. Reads go through `useDbQuery` (effect-loaded, cached per key, re-read on
+  every `bump()`); settings and categories are primed before the first render in `_layout`.
+- **`scripts/patch-expo-sqlite.js` stays, with its `postinstall` hook.** It now carries one
+  fix: the sync bridge's length header was written as a *single byte*, truncating any result
+  of 256+ bytes. Nothing calls the sync API any more, so this only guards against one
+  creeping back. The second fix (the sync wait's timeout budget) was removed with the async
+  migration. It is a string replacement rather than a `.patch` on purpose: patch-package
+  matched context, which failed on Netlify's Linux runner and broke every deploy for hours.
+  If upstream fixes the header, delete the script rather than carry it.
 - **Check what is actually deployed before trusting a fix.** Fingerprint the served bundle
   for a string unique to the commit — `fetch('/')`, pull the `entry-*.js` URL out of the HTML,
   fetch it and grep. Pushed is not deployed.
@@ -431,47 +426,25 @@ currency validation. There are no component tests; the UI was checked by using i
 
 ## 12. Open items — read this before touching anything
 
-### 1. Migrate `src/db` and the hooks to expo-sqlite's **async** API. Do this first.
+Done on 2026-09-24, and verified in the exported web build (Edge headless + the desktop
+browser pane): the async migration, duplicate clean-up and restore-from-backup in
+Settings, a service worker (launches with the server down, still cross-origin isolated),
+"not logged" stopping at now instead of counting the future, week navigation on Day,
+date + note on transactions, a top-anchored toast that no longer blocks taps. An upgrade
+from the previous build was tested on the same origin: existing entries and transactions
+survived.
 
-This is the single most important task and the cause of nearly every bug reported
-from real use. Everything below it is smaller.
+### 1. Test on the iPhone. Nothing above has been run in iOS Safari yet.
+Specifically: the freeze should be gone (the whole point of the async move), the share
+sheet should still open from "Back up my data" (the backup is built as Settings opens so
+the tap stays inside Safari's gesture window), the file picker for restore, and offline
+launch from the home screen.
 
-`expo-sqlite`'s sync API on web (`getAllSync`, `runSync`) does not run SQLite on the
-main thread. It posts to a worker and then **busy-spins the main thread** on an
-`Atomics` lock until the worker answers. On a phone that design fails in four ways,
-all of which were hit on device:
+### 2. Categories can only be renamed or hidden, not added. Dynamic Type unverified.
 
-- the wait had a budget of ~20-40ms, so writes threw `Sync operation timeout` *after*
-  the worker had already committed them — data saved, UI stale, button looked dead
-- a throw from a read happens **during render**, which the error boundary turns into
-  a full-screen crash
-- every write bumps one shared counter, re-querying every hook on every mounted tab
-  — about ten blocking round-trips per save. If the worker stalls, that was ten
-  timeouts back to back: a multi-second freeze on all five tabs at once
-- the main thread never yields while spinning, so on a low-power device it can starve
-  the very worker it is waiting for
-
-**Everything currently in place around this is containment, not a cure** (see the
-invariants below). Async removes the blocking entirely. Expect to touch: `src/db/*`
-(every query becomes `await`), the five domain hooks (`useMemo` reads become
-state loaded in an effect), and the screens that assume data is present on first
-render. `safeRead` and the timeout patch can then be deleted.
-
-### 2. Clean up duplicate records
-Repeated taps during the dead-button period created duplicates in real data. Inserts
-are idempotent now, but the existing rows are still there. A "Remove duplicate
-entries" action in Settings — one `DELETE` keeping `MIN(id)` per identical
-`(start_time, end_time, category_id)` — was offered and not yet built.
-
-### 3. No service worker
-Data is local, but the app shell is fetched on every cold start. Force-quit with no
-signal can show Safari's offline page. This is the last violation of §2's
-"works with zero network".
-
-### 4. Restore from a backup
-Export is one-way. "Clear website data" is unrecoverable even holding the JSON.
-
-### 5. Categories can only be renamed or hidden, not added. Dynamic Type unverified.
+### 3. Service worker keeps old hashed bundles
+Each deploy adds ~2 MB of `/_expo` files to the cache; old ones are never pruned. Harmless
+for a long while. Bump `CACHE` in `public/sw.js` to reset it.
 
 ---
 
@@ -480,18 +453,20 @@ Export is one-way. "Clear website data" is unrecoverable even holding the JSON.
 Each of these fixed a bug found on a real device. A new session that "simplifies" any
 of them will reintroduce a failure that took a long time to find.
 
-- **Writes must not be the only thing wrapped.** Reads run during render; an
-  unguarded one crashes the app. `safeRead` falls back to the last value and, after
-  one failure, skips further reads for three seconds so a stall is paid once instead
-  of once per hook.
-- **`bump()` runs in `finally`.** A failed write may well have landed; the UI has to
-  show what is actually stored.
+- **Reads never throw into render.** `useDbQuery` loads in an effect; a failed read
+  logs and keeps the last value.
+- **`bump()` runs in `finally`** (`useWrite` in `DbVersionContext`). A failed write may
+  well have landed; the UI has to show what is actually stored.
 - **Every write path has try/catch and says something** — inline where the action
   happened, plus a toast. `Alert.alert` is a **no-op** on react-native-web; never use
   it. That is why Save silently did nothing for a whole session.
-- **Inserts are idempotent** (`src/db/*.ts`) and submits are debounced
-  (`useSubmitGuard`). Nothing on the write path was idempotent, and a blocked main
-  thread means a second tap fires the instant the first finishes.
+- **Inserts are idempotent** (`src/db/*.ts`) — the duplicate check and the insert are one
+  `INSERT … SELECT … WHERE NOT EXISTS` statement, so two async saves can't both pass it.
+  Submits go through `useSubmitGuard`, which ignores a tap while a save is in flight.
+- **The toast is not a Modal.** A Modal on web is a full-screen layer and swallowed every
+  tap while a toast was up. `ToastLayer` is a pass-through strip at the top.
+- **Log's start and duration are `null` until touched** and follow the defaults until then;
+  data arrives after the first render now, so a value captured at mount is wrong.
 - **`scripts/patch-expo-sqlite.js`** — see §11. Each fix is applied independently
   because CI restores a cached `node_modules` that may be half patched.
 - **Offsets come from an entry's own day**, not the day on screen. An entry crossing
@@ -546,11 +521,11 @@ Tradeoffs knowingly accepted:
   ships an iOS Safari implementation that fakes feedback with a hidden switch toggle.
 - **Existing phone data does not migrate.** Browser storage is a different store from the
   SQLite file inside Expo Go's sandbox. Whatever is currently logged on the phone starts
-  over. This makes §12 item 2 (JSON export) more valuable, not less.
+  over. This makes the JSON export (and restore, in Settings) more valuable, not less.
 
 **The open question is answered (2026-09-22): `expo-sqlite` does work in the browser.**
 Tested by exporting the web build, serving it, logging an entry and reloading — the entry
-survived. `src/db/` keeps its synchronous query API. Three things were required to get
+survived. Three things were required to get
 there, and all three are load-bearing:
 
 1. **`metro.config.js` must add `wasm` to `resolver.assetExts`.** Without it the web export
@@ -559,7 +534,7 @@ there, and all three are load-bearing:
    web: it blocks the main thread spinning on `Atomics` while waiting for a worker that
    hasn't compiled its wasm yet, and throws `Sync operation timeout` every time. `initDb()`
    now awaits `openDatabaseAsync` and the root layout waits on it before rendering. Every
-   query after that stays synchronous, because by then the worker is warm.
+   query after that is async too (§11) — the sync API was the source of the freezes.
 3. **The host must send `Cross-Origin-Opener-Policy: same-origin` and
    `Cross-Origin-Embedder-Policy: require-corp`.** OPFS and the sync bridge need
    `SharedArrayBuffer`, which needs cross-origin isolation. Without these headers the app
