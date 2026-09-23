@@ -1,25 +1,28 @@
-import { useRef } from 'react';
+import { useCallback, useRef } from 'react';
 
 /**
- * Ignores a repeat submit that lands within `windowMs` of the last one.
+ * Runs a submit unless one is already in flight, or finished within `windowMs`.
  *
- * Saving blocks the main thread while SQLite works, so a second tap doesn't get
- * dropped — it queues and fires the moment the first finishes, writing the same
- * thing twice. Nothing about the write path is idempotent, so this is what stops
- * an impatient double-tap becoming two records.
+ * Saves are async, so an impatient second tap lands while the first is still
+ * writing — and would write the same thing twice. Inserts are idempotent in the
+ * database too; this stops the second write being attempted at all. The window
+ * starts when the save ends, not when it began.
  */
-export function useSubmitGuard(windowMs = 700): () => boolean {
-  const last = useRef(0);
-  return () => {
-    const now = Date.now();
-    if (now - last.current < windowMs) return false;
-    // Stamped again by the caller when the work finishes. The window has to start
-    // from the end of the save, not the beginning: a save that blocks for a second
-    // puts the next tap outside the window before it is even delivered.
-    last.current = now;
-    queueMicrotask(() => {
-      last.current = Date.now();
-    });
-    return true;
-  };
+export function useSubmitGuard(windowMs = 700) {
+  const busy = useRef(false);
+  const finishedAt = useRef(0);
+
+  return useCallback(
+    async (work: () => Promise<void>) => {
+      if (busy.current || Date.now() - finishedAt.current < windowMs) return;
+      busy.current = true;
+      try {
+        await work();
+      } finally {
+        busy.current = false;
+        finishedAt.current = Date.now();
+      }
+    },
+    [windowMs]
+  );
 }

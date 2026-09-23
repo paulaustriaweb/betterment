@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 
 import {
   deleteTransaction,
@@ -7,53 +7,25 @@ import {
   updateTransaction,
   type TransactionInput,
 } from '@/db/transactions';
-import { useDbVersion } from './DbVersionContext';
-import { safeRead } from '@/db/safeRead';
 import type { Transaction } from '@/lib/types';
+import { useWrite } from './DbVersionContext';
+import { useDbQuery } from './useDbQuery';
+
+const NONE: Transaction[] = [];
 
 export function useTransactionsForRange(rangeStart: Date, rangeEnd: Date) {
-  const { version, bump } = useDbVersion();
+  const write = useWrite();
   const startIso = rangeStart.toISOString();
   const endIso = rangeEnd.toISOString();
+  const read = useCallback(() => listTransactionsForRange(startIso, endIso), [startIso, endIso]);
+  const { data: transactions, current: ready, loaded } = useDbQuery(`tx:${startIso}:${endIso}`, read, NONE);
 
-  const transactions = useMemo(
-    () => safeRead(`tx:${startIso}:${endIso}`, () => listTransactionsForRange(startIso, endIso), [] as Transaction[]),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [startIso, endIso, version]
-  );
-
-  const add = useCallback(
-    (input: TransactionInput) => {
-      try {
-        return insertTransaction(input);
-      } finally {
-        bump();
-      }
-    },
-    [bump]
-  );
-
+  const add = useCallback((input: TransactionInput) => write(() => insertTransaction(input)), [write]);
   const update = useCallback(
-    (id: number, input: TransactionInput) => {
-      try {
-        updateTransaction(id, input);
-      } finally {
-        bump();
-      }
-    },
-    [bump]
+    (id: number, input: TransactionInput) => write(() => updateTransaction(id, input)),
+    [write]
   );
+  const remove = useCallback((id: number) => write(() => deleteTransaction(id)), [write]);
 
-  const remove = useCallback(
-    (id: number) => {
-      try {
-        deleteTransaction(id);
-      } finally {
-        bump();
-      }
-    },
-    [bump]
-  );
-
-  return { transactions, add, update, remove };
+  return { transactions, ready, loaded, add, update, remove };
 }

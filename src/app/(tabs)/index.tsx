@@ -26,6 +26,7 @@ import { useTimeBlocksForRange } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, type } from '@/lib/colors';
 import { fitFontSize } from '@/lib/fit';
 import {
+  capAtNow,
   greeting,
   formatDuration,
   formatHoursPadded,
@@ -67,21 +68,25 @@ export default function OverviewScreen() {
     return { rangeStart: s, rangeEnd: addDays(s, 1) };
   }, [range, now, weekStartsOn]);
 
-  const blocks = useTimeBlocksForRange(rangeStart, rangeEnd);
+  const { blocks, loaded } = useTimeBlocksForRange(rangeStart, rangeEnd);
 
   // The sparkline is always a 7-day trend, whatever range the hero is showing.
   const trendStart = useMemo(() => startOfDay(subDays(now, 6)), [now]);
   const trendEnd = useMemo(() => addDays(startOfDay(now), 1), [now]);
-  const trendBlocks = useTimeBlocksForRange(trendStart, trendEnd);
+  const { blocks: trendBlocks } = useTimeBlocksForRange(trendStart, trendEnd);
 
-  const unaccounted = unaccountedMinutesInRange(blocks, rangeStart, rangeEnd);
-  const logged = loggedMinutesInRange(blocks, rangeStart, rangeEnd);
-  const totalMinutes = differenceInMinutes(rangeEnd, rangeStart);
+  // Every figure stops at now. The rest of the range hasn't happened, so counting it
+  // as "not logged" made the hero read 24h at breakfast and ~230h on the 23rd.
+  const elapsedEnd = useMemo(() => capAtNow(rangeEnd, now), [rangeEnd, now]);
+  const unaccounted = unaccountedMinutesInRange(blocks, rangeStart, elapsedEnd);
+  const logged = loggedMinutesInRange(blocks, rangeStart, elapsedEnd);
+  const totalMinutes = differenceInMinutes(elapsedEnd, rangeStart);
+  const share = (minutes: number) => (totalMinutes > 0 ? Math.round((minutes / totalMinutes) * 100) : 0);
 
   const trend = useMemo(
     () =>
       eachDayOfInterval({ start: trendStart, end: startOfDay(now) }).map(
-        (d) => unaccountedMinutesInRange(trendBlocks, d, addDays(d, 1)) / 60
+        (d) => unaccountedMinutesInRange(trendBlocks, d, capAtNow(addDays(d, 1), now)) / 60
       ),
     [trendBlocks, trendStart, now]
   );
@@ -94,11 +99,11 @@ export default function OverviewScreen() {
     const scanEnd = lastDay > cutoff ? cutoff : lastDay;
     if (scanEnd < rangeStart) return 0;
     const days = eachDayOfInterval({ start: rangeStart, end: scanEnd });
-    return days.reduce((max, d) => Math.max(max, longestGapMinutes(blocks, d)), 0);
+    return days.reduce((max, d) => Math.max(max, longestGapMinutes(blocks, d, now)), 0);
   }, [blocks, rangeStart, rangeEnd, now]);
 
   const breakdown = useMemo(() => {
-    const totals = minutesByCategory(blocks, rangeStart, rangeEnd);
+    const totals = minutesByCategory(blocks, rangeStart, elapsedEnd);
     const rows = categories
       .map((c) => ({
         key: `c${c.id}`,
@@ -109,15 +114,20 @@ export default function OverviewScreen() {
       .filter((r) => r.minutes > 0);
     rows.push({ key: 'unaccounted', label: 'Not logged', color: colors.rose, minutes: unaccounted });
     return rows.sort((a, b) => b.minutes - a.minutes);
-  }, [blocks, categories, rangeStart, rangeEnd, unaccounted]);
+  }, [blocks, categories, rangeStart, elapsedEnd, unaccounted]);
 
   const leader = breakdown[0];
   const breakdownHint =
     breakdown.length === 0
       ? 'Nothing logged yet'
-      : `${leader.label} leads at ${Math.round((leader.minutes / totalMinutes) * 100)}%`;
+      : `${leader.label} leads at ${share(leader.minutes)}%`;
 
   const rangeLabel = RANGES.find((r) => r.key === range)?.label ?? 'Today';
+
+  // One blank frame on a cold start beats flashing "every hour missing" before the
+  // entries have arrived. Only ever the first load — later switches keep the last
+  // figures on screen until the new ones land.
+  if (!loaded) return <View style={styles.screen} />;
 
   return (
     <View style={styles.screen}>
@@ -161,7 +171,7 @@ export default function OverviewScreen() {
             {formatHoursPadded(unaccounted)}
           </Text>
           <Text style={styles.heroSub}>
-            of {Math.round(totalMinutes / 60)}h {rangeLabel.toLowerCase()}
+            of {formatDuration(totalMinutes)} so far {rangeLabel.toLowerCase()}
           </Text>
 
           <View style={styles.spark}>
@@ -198,7 +208,7 @@ export default function OverviewScreen() {
         ) : (
           <ScrollView style={styles.sheetScroll}>
             {breakdown.map((row) => {
-              const pct = Math.round((row.minutes / totalMinutes) * 100);
+              const pct = share(row.minutes);
               return (
                 <View key={row.key} style={styles.breakdownRow}>
                   <View style={styles.breakdownTop}>

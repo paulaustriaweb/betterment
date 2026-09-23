@@ -18,7 +18,7 @@ import type { Goal } from '@/lib/types';
 
 export default function GoalsScreen() {
   const now = useNow();
-  const { goals, add, update, setComplete, remove } = useGoals();
+  const { goals, loaded, add, update, setComplete, remove } = useGoals();
   const toast = useToast();
   const [weekStart] = useSetting('week_starts_on', '0');
   const [editing, setEditing] = useState<Goal | null>(null);
@@ -34,13 +34,13 @@ export default function GoalsScreen() {
   // All of them: capping the slice hid later goals with no way to reach them.
   const upcoming = active.slice(1);
 
-  function toggle(id: number, complete: boolean) {
+  async function toggle(id: number, complete: boolean) {
     try {
       Haptics.notificationAsync(
         complete ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
       );
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setComplete(id, complete);
+      await setComplete(id, complete);
       setNotice(null);
       toast(complete ? 'Done — nice.' : 'Back on the list.', {
         action: { label: 'Undo', onPress: () => setComplete(id, !complete) },
@@ -48,36 +48,42 @@ export default function GoalsScreen() {
     } catch (error) {
       console.error('goal toggle failed', error);
       setNotice("Couldn't update that — try again.");
+      toast("Couldn't update that — try again.", { tone: 'danger' });
     }
   }
 
-  function saveGoal(title: string, deadlineIso: string, id?: number) {
+  async function saveGoal(title: string, deadlineIso: string, id?: number) {
     if (id) {
-      update(id, title, deadlineIso);
+      await update(id, title, deadlineIso);
       toast('Goal updated.');
     } else {
-      add(title, deadlineIso);
+      await add(title, deadlineIso);
       toast('Goal added.');
     }
   }
 
-  function handleDelete(goal: Goal) {
+  async function handleDelete(goal: Goal) {
     try {
-      remove(goal.id);
+      await remove(goal.id);
       setNotice(null);
       // Undo rather than a confirm sheet, per the States board.
       toast(`Deleted "${goal.title}".`, {
-        action: { label: 'Undo', onPress: () => add(goal.title, goal.deadline) },
+        // Its original created date comes back too, so the progress bar does.
+        action: { label: 'Undo', onPress: () => add(goal.title, goal.deadline, goal.createdAt) },
       });
     } catch (error) {
       // An unhandled throw here left the row sitting there looking frozen.
       console.error('goal delete failed', error);
       setNotice("Couldn't delete that — try again.");
+      toast("Couldn't delete that — try again.", { tone: 'danger' });
     }
   }
 
   const nextDays = next ? daysUntil(next.deadline, now) : 0;
   const nextUrgency = urgencyOf(nextDays);
+
+  // Hold the hero back until the first read lands, rather than flash "No deadlines".
+  if (!loaded) return <View style={styles.screen} />;
 
   return (
     <View style={styles.screen}>

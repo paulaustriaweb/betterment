@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useSetting } from '@/hooks/useSettings';
-import { exportBackup } from '@/lib/backup';
 import { colors, font } from '@/lib/colors';
 import { formatCurrency, isValidCurrency } from '@/lib/currency';
 import { formatDuration } from '@/lib/time';
 import { remindersSupported } from '@/lib/notifications';
 import { Banner } from './Banner';
+import { DataRows } from './DataRows';
 import { useToast } from './Toast';
-import { BellIcon, DownloadIcon, TagIcon } from './icons';
+import { BellIcon, TagIcon } from './icons';
 import { DisclosureRow, Sheet } from './ui';
 
 const WEEK_STARTS = [
@@ -41,7 +41,7 @@ export function SettingsSheet({
 
   const valid = isValidCurrency(draft);
 
-  function commitCurrency() {
+  async function commitCurrency() {
     if (!valid) {
       setDraft(currency);
       return;
@@ -49,7 +49,7 @@ export function SettingsSheet({
     const next = draft.toUpperCase();
     if (next === currency) return;
     try {
-      setCurrency(next);
+      await setCurrency(next);
       setError(null);
       toast(`Currency is now ${next}.`);
     } catch (e) {
@@ -58,10 +58,10 @@ export function SettingsSheet({
     }
   }
 
-  function pickWeekStart(value: string) {
+  async function pickWeekStart(value: string) {
     if (value === weekStart) return;
     try {
-      setWeekStart(value);
+      await setWeekStart(value);
       setError(null);
       toast(`Weeks now start on ${value === '1' ? 'Monday' : 'Sunday'}.`);
     } catch (e) {
@@ -70,27 +70,16 @@ export function SettingsSheet({
     }
   }
 
-  function pickDuration(minutes: number) {
+  async function pickDuration(minutes: number) {
     const value = String(minutes);
     if (value === defaultDuration) return;
     try {
-      setDefaultDuration(value);
+      await setDefaultDuration(value);
       setError(null);
       toast(`New entries start at ${formatDuration(minutes)}.`);
     } catch (e) {
       console.error('default duration save failed', e);
       setError("Couldn't save that — try again.");
-    }
-  }
-
-  async function backUp() {
-    try {
-      const { name, rows } = await exportBackup();
-      setError(null);
-      toast(`Saved ${name} — ${rows} rows.`, { durationMs: 5000 });
-    } catch (e) {
-      console.error('backup failed', e);
-      setError("Couldn't save the file — try again.");
     }
   }
 
@@ -189,12 +178,10 @@ export function SettingsSheet({
             }
             onPress={onOpenReminder}
           />
-          <DisclosureRow
-            icon={<DownloadIcon color={colors.rose} />}
-            title="Back up my data"
-            hint="Everything as one JSON file"
-            onPress={backUp}
-          />
+        </View>
+
+        <View style={styles.dataRows}>
+          <DataRows />
         </View>
 
         {error ? (
@@ -238,6 +225,7 @@ const styles = StyleSheet.create({
   optionLabelActive: { color: colors.surface },
 
   rows: { marginTop: 22, gap: 8 },
+  dataRows: { marginTop: 8 },
   banner: { marginTop: 14 },
   note: { fontFamily: font.regular, fontSize: 11.5, color: colors.inkSoft, lineHeight: 17, marginTop: 18, marginBottom: 6 },
 });

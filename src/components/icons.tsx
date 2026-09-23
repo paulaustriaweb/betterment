@@ -83,6 +83,14 @@ export function ChevronRightIcon({ color, size = 17, strokeWidth = 2.4 }: IconPr
   );
 }
 
+export function ChevronLeftIcon({ color, size = 17, strokeWidth = 2.4 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" {...stroke(color, strokeWidth)}>
+      <Path d="M15 18l-6-6 6-6" />
+    </Svg>
+  );
+}
+
 export function ArrowRightIcon({ color, size = 15, strokeWidth = 2.4 }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" {...stroke(color, strokeWidth)}>

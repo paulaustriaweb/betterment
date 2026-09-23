@@ -3,6 +3,7 @@ import {
   eachDayOfInterval,
   endOfMonth,
   format,
+  isAfter,
   isBefore,
   isSameDay,
   isSameMonth,
@@ -23,11 +24,13 @@ interface Props {
   onChange: (date: Date) => void;
   /** Days before this can't be picked — a deadline in the past is a typo. */
   minDate?: Date;
+  /** Days after this can't be picked — money that hasn't moved yet. */
+  maxDate?: Date;
   weekStartsOn?: 0 | 1;
 }
 
 /** Month grid built from Views. No date-picker dependency, same as the bars and sparklines. */
-export function MonthCalendar({ value, onChange, minDate, weekStartsOn = 0 }: Props) {
+export function MonthCalendar({ value, onChange, minDate, maxDate, weekStartsOn = 0 }: Props) {
   const [month, setMonth] = useState(() => startOfMonth(value));
 
   // Whole weeks, so every row has seven cells and the grid never goes ragged.
@@ -43,6 +46,7 @@ export function MonthCalendar({ value, onChange, minDate, weekStartsOn = 0 }: Pr
   );
 
   const floor = minDate ? startOfDay(minDate) : null;
+  const ceiling = maxDate ? startOfDay(maxDate) : null;
 
   return (
     <View>
@@ -84,7 +88,7 @@ export function MonthCalendar({ value, onChange, minDate, weekStartsOn = 0 }: Pr
         {days.map((day) => {
           const selected = isSameDay(day, value);
           const outside = !isSameMonth(day, month);
-          const disabled = floor ? isBefore(day, floor) : false;
+          const disabled = (floor ? isBefore(day, floor) : false) || (ceiling ? isAfter(day, ceiling) : false);
           return (
             <Pressable
               key={day.toISOString()}

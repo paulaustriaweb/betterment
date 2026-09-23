@@ -14,12 +14,17 @@ let ready: Promise<void> | null = null;
  * `new Error(message)` on the way back across postMessage, so the DOMException
  * name is gone by the time it reaches us and only survives inside the string.
  */
+export const ALREADY_OPEN = 'AlreadyOpen';
+
 const LOCKED = /InvalidStateError|NoModificationAllowedError|createSyncAccessHandle/;
 
 function explain(error: unknown): Error {
   const text = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
   if (LOCKED.test(text)) {
-    return new Error('Betterment is already open in another tab or window. Close it, then tap Try again.');
+    const locked = new Error('Betterment is already open in another tab or window. Close it, then tap Try again.');
+    // Read by ErrorScreen: this is an expected state, not a crash, and shouldn't say so.
+    locked.name = ALREADY_OPEN;
+    return locked;
   }
   return error instanceof Error ? error : new Error(text);
 }
@@ -33,8 +38,8 @@ export function initDb(): Promise<void> {
   if (!ready) {
     ready = (async () => {
       const db = await openDb();
-      runMigrations(db);
-      seedIfEmpty(db);
+      await runMigrations(db);
+      await seedIfEmpty(db);
     })().catch((error: unknown) => {
       ready = null;
       throw explain(error);

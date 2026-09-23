@@ -34,47 +34,57 @@ export interface TransactionInput {
   date: string;
 }
 
-export function listTransactionsForRange(rangeStartIso: string, rangeEndIso: string): Transaction[] {
-  const db = getDb();
-  const rows = db.getAllSync<TransactionRow>(
+export async function listTransactionsForRange(rangeStartIso: string, rangeEndIso: string): Promise<Transaction[]> {
+  const rows = await getDb().getAllAsync<TransactionRow>(
     'SELECT * FROM transactions WHERE date >= ? AND date < ? ORDER BY date DESC, id DESC',
     [rangeStartIso, rangeEndIso]
   );
   return rows.map(toTransaction);
 }
 
-export function insertTransaction(input: TransactionInput): number {
+// Two identical amounts on the same day are plausible — two coffees — so this
+// can't dedupe on the values alone. A retry within a few seconds of an identical
+// one is a double save, not a second coffee.
+const RECENT_TWIN = `SELECT id FROM transactions
+  WHERE type = ? AND amount = ?
+    AND IFNULL(category, '') = IFNULL(?, '')
+    AND IFNULL(source, '') = IFNULL(?, '')
+    AND created_at >= ?`;
+
+export async function insertTransaction(input: TransactionInput): Promise<number> {
   const db = getDb();
-
-  // Two identical amounts on the same day are plausible — two coffees — so this
-  // can't dedupe on the values alone. A retry within a few seconds of an identical
-  // one is a double save, not a second coffee.
   const since = new Date(Date.now() - 8000).toISOString();
-  const duplicate = db.getFirstSync<{ id: number }>(
-    `SELECT id FROM transactions
-     WHERE type = ? AND amount = ?
-       AND IFNULL(category, '') = IFNULL(?, '')
-       AND IFNULL(source, '') = IFNULL(?, '')
-       AND created_at >= ?
-     LIMIT 1`,
-    [input.type, input.amount, input.category, input.source, since]
-  );
-  if (duplicate) return duplicate.id;
+  const twin = [input.type, input.amount, input.category, input.source, since];
 
-  const result = db.runSync(
-    'INSERT INTO transactions (type, amount, category, source, note, date, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [input.type, input.amount, input.category, input.source, input.note, input.date, new Date().toISOString()]
+  // Check and insert in one statement, so two saves can't both pass the check.
+  const result = await db.runAsync(
+    `INSERT INTO transactions (type, amount, category, source, note, date, created_at)
+     SELECT ?, ?, ?, ?, ?, ?, ?
+     WHERE NOT EXISTS (${RECENT_TWIN})`,
+    [
+      input.type,
+      input.amount,
+      input.category,
+      input.source,
+      input.note,
+      input.date,
+      new Date().toISOString(),
+      ...twin,
+    ]
   );
-  return result.lastInsertRowId;
+  if (result.changes > 0) return result.lastInsertRowId;
+
+  const existing = await db.getFirstAsync<{ id: number }>(`${RECENT_TWIN} LIMIT 1`, twin);
+  return existing?.id ?? 0;
 }
 
-export function updateTransaction(id: number, input: TransactionInput): void {
-  getDb().runSync(
+export async function updateTransaction(id: number, input: TransactionInput): Promise<void> {
+  await getDb().runAsync(
     'UPDATE transactions SET type = ?, amount = ?, category = ?, source = ?, note = ?, date = ? WHERE id = ?',
     [input.type, input.amount, input.category, input.source, input.note, input.date, id]
   );
 }
 
-export function deleteTransaction(id: number): void {
-  getDb().runSync('DELETE FROM transactions WHERE id = ?', [id]);
+export async function deleteTransaction(id: number): Promise<void> {
+  await getDb().runAsync('DELETE FROM transactions WHERE id = ?', [id]);
 }

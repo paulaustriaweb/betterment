@@ -17,7 +17,8 @@ interface Props {
   editing: Goal | null;
   weekStartsOn: 0 | 1;
   onClose: () => void;
-  onSave: (title: string, deadlineIso: string, id?: number) => void;
+  /** Rejects on a failed write; the sheet stays open and says so. */
+  onSave: (title: string, deadlineIso: string, id?: number) => Promise<void>;
 }
 
 export function AddGoalSheet({ visible, editing, weekStartsOn, onClose, onSave }: Props) {
@@ -26,7 +27,7 @@ export function AddGoalSheet({ visible, editing, weekStartsOn, onClose, onSave }
   const [deadline, setDeadline] = useState(() => addMonths(startOfDay(now), 1));
   const [pickerOpen, setPickerOpen] = useState(false);
   const [failed, setFailed] = useState(false);
-  const allowSubmit = useSubmitGuard();
+  const submit = useSubmitGuard();
 
   // The sheet never unmounts, so load during render. Keyed on open/closed as well as
   // the row, so reopening starts from what is stored rather than from whatever was
@@ -56,15 +57,20 @@ export function AddGoalSheet({ visible, editing, weekStartsOn, onClose, onSave }
   const canSave = title.trim().length > 0;
 
   function save() {
-    if (!canSave || !allowSubmit()) return;
-    try {
-      onSave(title.trim(), deadline.toISOString(), editing?.id);
-      setFailed(false);
-      onClose();
-    } catch (error) {
-      console.error('goal save failed', error);
-      setFailed(true);
-    }
+    if (!canSave) return;
+    const name = title.trim();
+    const deadlineIso = deadline.toISOString();
+    const id = editing?.id;
+    submit(async () => {
+      try {
+        await onSave(name, deadlineIso, id);
+        setFailed(false);
+        onClose();
+      } catch (error) {
+        console.error('goal save failed', error);
+        setFailed(true);
+      }
+    });
   }
 
   return (

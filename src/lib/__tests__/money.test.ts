@@ -1,4 +1,4 @@
-import { cumulative, netOf, sumByType, transactionLabel, withinRange } from '../money';
+import { cumulative, netOf, onDay, sumByType, transactionLabel, withinRange } from '../money';
 import type { Transaction } from '../types';
 
 function tx(id: number, type: 'expense' | 'income', amount: number, date: string): Transaction {
@@ -61,5 +61,17 @@ describe('transactionLabel', () => {
   it('uses category for expenses and source for income', () => {
     expect(transactionLabel(rows[0])).toBe('Food');
     expect(transactionLabel(rows[1])).toBe('Freelance');
+  });
+});
+
+describe('onDay', () => {
+  it("moves to the picked date and keeps the clock time", () => {
+    const result = onDay(new Date('2026-09-20T00:00:00'), new Date('2026-09-23T21:15:30'));
+    expect(result).toEqual(new Date('2026-09-20T21:15:30'));
+  });
+
+  it('crosses a month boundary', () => {
+    const result = onDay(new Date('2026-08-31T00:00:00'), new Date('2026-09-01T08:00:00'));
+    expect(result).toEqual(new Date('2026-08-31T08:00:00'));
   });
 });

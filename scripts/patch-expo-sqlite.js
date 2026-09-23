@@ -1,21 +1,22 @@
 /**
- * Fixes bugs in expo-sqlite 57's web sync bridge. Runs from postinstall.
+ * Fixes a bug in expo-sqlite 57's web sync bridge. Runs from postinstall.
  *
  * This is a plain string replacement rather than patch-package because a .patch
  * applies by matching surrounding context, which held locally and failed on the
  * CI runner — taking every deploy with it. Exact replacement either matches or
  * says so, identically everywhere.
  *
- * 1. The length header of a sync result was written with
- *    `Uint8Array.set(new Uint32Array([length]))`, which converts element-wise and
- *    writes a single byte. Results of 256 bytes or more came back truncated to
- *    `length % 256`, i.e. JSON cut mid-token.
- * 2. The wait for the worker was budgeted at 1,000,000 `Atomics.pause()` calls,
- *    about 20-40ms. An OPFS flush on a phone takes longer, so writes threw
- *    "Sync operation timeout" after the worker had already committed them.
+ * The length header of a sync result was written with
+ * `Uint8Array.set(new Uint32Array([length]))`, which converts element-wise and
+ * writes a single byte. Results of 256 bytes or more came back truncated to
+ * `length % 256`, i.e. JSON cut mid-token.
  *
- * Re-check both on any expo-sqlite upgrade. If upstream has fixed them, delete
- * this script and the postinstall hook rather than carrying it forward.
+ * The app no longer makes sync calls — every query is async — so this only guards
+ * against a sync call creeping back in. A second fix, for the sync wait's timeout
+ * budget, was dropped with the async migration: nothing waits on that loop now.
+ *
+ * Re-check on any expo-sqlite upgrade. If upstream has fixed it, delete this
+ * script and the postinstall hook rather than carrying it forward.
  */
 const fs = require('fs');
 const path = require('path');
@@ -32,48 +33,6 @@ const REPLACEMENTS = [
     name: 'length header read back',
     find: `  const length = new Uint32Array(resultArray.buffer, 0, 1)[0];`,
     replace: `  const length = new DataView(resultArray.buffer).getUint32(0, true);`,
-  },
-  {
-    name: 'iteration-count timeout',
-    // Any budget counts as applied — the exact number is set by the rule below.
-    applied: `const deadline = Date.now() +`,
-    find: `  while (Atomics.load(lock, 0) === PENDING) {
-    ++i;
-
-    if (useAtomicsPause) {
-      if (i > 1_000_000) {
-        throw new Error('Sync operation timeout');
-      }
-      // @ts-expect-error: Remove this when TypeScript supports Atomics.pause
-      Atomics.pause();
-    } else {
-      // NOTE(kudo): Unfortunate for the busy loop,
-      // because we don't have a way for main thread to yield its execution to other callbacks.
-      if (i > 1000_000_000) {
-        throw new Error('Sync operation timeout');
-      }
-    }
-  }`,
-    replace: `  const deadline = Date.now() + 5000;
-  while (Atomics.load(lock, 0) === PENDING) {
-    // Reading the clock every iteration would cost more than the pause it replaces.
-    if ((++i & 0xffff) === 0 && Date.now() > deadline) {
-      throw new Error('Sync operation timeout');
-    }
-
-    if (useAtomicsPause) {
-      // @ts-expect-error: Remove this when TypeScript supports Atomics.pause
-      Atomics.pause();
-    }
-  }`,
-  },
-  {
-    // Separate rule so it also rewrites a node_modules the CI cache restored with
-    // the old budget. 5s meant a slow write froze the UI for five seconds before
-    // giving up; reads fall back safely now, so failing fast is the better trade.
-    name: 'timeout budget',
-    find: `const deadline = Date.now() + 5000;`,
-    replace: `const deadline = Date.now() + 1200;`,
   },
 ];
 
@@ -93,8 +52,8 @@ function main() {
   let patched = original;
   let applied = 0;
   let skipped = 0;
-  for (const { name, find, replace, applied: appliedMarker } of REPLACEMENTS) {
-    if (patched.includes(appliedMarker ?? replace)) {
+  for (const { name, find, replace } of REPLACEMENTS) {
+    if (patched.includes(replace)) {
       skipped += 1;
       continue;
     }

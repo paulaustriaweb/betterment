@@ -13,12 +13,29 @@ import { useEffect, useState } from 'react';
 
 import { ErrorScreen } from '@/components/ErrorScreen';
 import { ToastProvider } from '@/components/Toast';
+import { listCategories } from '@/db/categories';
 import { initDb } from '@/db/init';
+import { listSettings } from '@/db/settings';
 import { DbVersionProvider } from '@/hooks/DbVersionContext';
+import { CATEGORIES_KEY } from '@/hooks/useCategories';
+import { primeQuery } from '@/hooks/useDbQuery';
+import { SETTINGS_KEY } from '@/hooks/useSettings';
 import { colors } from '@/lib/colors';
 import { addReminderTapListener } from '@/lib/notifications';
+import { registerServiceWorker } from '@/lib/serviceWorker';
+
+/**
+ * Settings and categories are tiny and every screen reads them, so they load
+ * before the first render — no flash of the default currency or a missing chip.
+ */
+async function startDb(): Promise<void> {
+  await initDb();
+  primeQuery(SETTINGS_KEY, await listSettings());
+  primeQuery(CATEGORIES_KEY, await listCategories());
+}
 
 SplashScreen.preventAutoHideAsync();
+registerServiceWorker();
 
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return <ErrorScreen error={error} retry={retry} />;
@@ -29,7 +46,7 @@ export default function RootLayout() {
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState<Error | null>(null);
   const [dbAttempt, setDbAttempt] = useState(0);
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     InstrumentSans_400Regular,
     InstrumentSans_500Medium,
     InstrumentSans_600SemiBold,
@@ -37,13 +54,18 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    initDb().then(
+    startDb().then(
       () => setDbReady(true),
       (e: Error) => setDbError(e)
     );
   }, [dbAttempt]);
 
-  const ready = fontsLoaded && dbReady;
+  // A font that fails to load (offline cold start, blocked CDN) must not hold the
+  // app on a blank screen forever — the system font is an acceptable fallback.
+  useEffect(() => {
+    if (fontError) console.error('font load failed', fontError);
+  }, [fontError]);
+  const ready = (fontsLoaded || fontError !== null) && dbReady;
 
   useEffect(() => {
     if (ready || dbError) SplashScreen.hideAsync();

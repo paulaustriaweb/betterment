@@ -1,3 +1,5 @@
+import { set } from 'date-fns';
+
 import type { Transaction } from './types';
 
 export function sumByType(transactions: Transaction[], type: 'expense' | 'income'): number {
@@ -25,4 +27,12 @@ export function cumulative(values: number[]): number[] {
 /** Label a transaction by its category (expense) or source (income). */
 export function transactionLabel(t: Transaction): string {
   return (t.type === 'income' ? t.source : t.category) ?? 'Other';
+}
+
+/**
+ * `day`'s date with `timeFrom`'s clock time. Backdating an expense keeps a real time
+ * of day, so it still sorts among that day's other entries instead of at midnight.
+ */
+export function onDay(day: Date, timeFrom: Date): Date {
+  return set(timeFrom, { year: day.getFullYear(), month: day.getMonth(), date: day.getDate() });
 }

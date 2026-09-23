@@ -1,4 +1,5 @@
 import {
+  capAtNow,
   detectOverlap,
   findGaps,
   formatDuration,
@@ -6,6 +7,7 @@ import {
   longestGapMinutes,
   minutesByCategory,
   unaccountedHours,
+  unaccountedMinutesInRange,
 } from '../time';
 import type { TimeBlock } from '../types';
 
@@ -84,6 +86,46 @@ describe('findGaps', () => {
   it('returns no gaps for a fully logged day', () => {
     const blocks = [block(1, '2026-09-21T00:00:00', '2026-09-22T00:00:00')];
     expect(findGaps(blocks, day)).toEqual([]);
+  });
+});
+
+describe('findGaps until now', () => {
+  const now = new Date('2026-09-21T08:00:00');
+
+  it('stops at now — the rest of the day has not happened yet', () => {
+    expect(findGaps([], day, now)).toEqual([{ start: 0, end: 480 }]);
+  });
+
+  it('drops gaps that start after now', () => {
+    const blocks = [block(1, '2026-09-21T00:00:00', '2026-09-21T07:00:00')];
+    expect(findGaps(blocks, day, now)).toEqual([{ start: 420, end: 480 }]);
+  });
+
+  it('reports nothing when an entry runs past now', () => {
+    const blocks = [block(1, '2026-09-21T00:00:00', '2026-09-21T09:00:00')];
+    expect(findGaps(blocks, day, now)).toEqual([]);
+  });
+
+  it('reports nothing for a day that has not started', () => {
+    expect(findGaps([], new Date('2026-09-22T12:00:00'), now)).toEqual([]);
+  });
+
+  it('ignores an until past midnight', () => {
+    expect(findGaps([], day, new Date('2026-09-23T00:00:00'))).toEqual([{ start: 0, end: 1440 }]);
+  });
+});
+
+describe('capAtNow', () => {
+  it('counts only elapsed time as not logged', () => {
+    const start = new Date('2026-09-21T00:00:00');
+    const end = new Date('2026-09-22T00:00:00');
+    const now = new Date('2026-09-21T08:00:00');
+    expect(unaccountedMinutesInRange([], start, capAtNow(end, now))).toBe(480);
+  });
+
+  it('keeps a range that is already over', () => {
+    const end = new Date('2026-09-22T00:00:00');
+    expect(capAtNow(end, new Date('2026-09-25T00:00:00'))).toBe(end);
   });
 });
 

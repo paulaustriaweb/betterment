@@ -13,16 +13,15 @@ interface CategoryRow {
  * is hidden, so every colour and name lookup has to still resolve — only the
  * picker on Log filters down to the active ones.
  */
-export function listCategories(): Category[] {
-  const db = getDb();
-  const rows = db.getAllSync<CategoryRow>('SELECT * FROM categories ORDER BY id ASC');
+export async function listCategories(): Promise<Category[]> {
+  const rows = await getDb().getAllAsync<CategoryRow>('SELECT * FROM categories ORDER BY id ASC');
   return rows.map((r) => ({ id: r.id, name: r.name, color: r.color, isActive: !!r.is_active }));
 }
 
-export function renameCategory(id: number, name: string): void {
-  getDb().runSync('UPDATE categories SET name = ? WHERE id = ?', [name, id]);
+export async function renameCategory(id: number, name: string): Promise<void> {
+  await getDb().runAsync('UPDATE categories SET name = ? WHERE id = ?', [name, id]);
 }
 
-export function setCategoryActive(id: number, active: boolean): void {
-  getDb().runSync('UPDATE categories SET is_active = ? WHERE id = ?', [active ? 1 : 0, id]);
+export async function setCategoryActive(id: number, active: boolean): Promise<void> {
+  await getDb().runAsync('UPDATE categories SET is_active = ? WHERE id = ?', [active ? 1 : 0, id]);
 }

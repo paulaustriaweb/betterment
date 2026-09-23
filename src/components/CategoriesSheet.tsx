@@ -20,7 +20,7 @@ export function CategoriesSheet({ visible, onClose }: { visible: boolean; onClos
   const [error, setError] = useState<string | null>(null);
   const toast = useToast();
 
-  function commit() {
+  async function commit() {
     const pending = draft;
     setDraft(null);
     if (!pending || !pending.name.trim()) return;
@@ -28,7 +28,7 @@ export function CategoriesSheet({ visible, onClose }: { visible: boolean; onClos
     const before = categories.find((c) => c.id === pending.id);
     if (before?.name === next) return;
     try {
-      rename(pending.id, next);
+      await rename(pending.id, next);
       setError(null);
       toast(`Renamed to "${next}".`, {
         action: before ? { label: 'Undo', onPress: () => rename(pending.id, before.name) } : undefined,
@@ -36,12 +36,13 @@ export function CategoriesSheet({ visible, onClose }: { visible: boolean; onClos
     } catch (e) {
       console.error('category rename failed', e);
       setError("Couldn't rename that — try again.");
+      toast("Couldn't rename that — try again.", { tone: 'danger' });
     }
   }
 
-  function toggleActive(id: number, name: string, active: boolean) {
+  async function toggleActive(id: number, name: string, active: boolean) {
     try {
-      setActive(id, active);
+      await setActive(id, active);
       setError(null);
       toast(active ? `${name} is back.` : `${name} hidden.`, {
         action: { label: 'Undo', onPress: () => setActive(id, !active) },
@@ -49,6 +50,7 @@ export function CategoriesSheet({ visible, onClose }: { visible: boolean; onClos
     } catch (e) {
       console.error('category visibility failed', e);
       setError("Couldn't change that — try again.");
+      toast("Couldn't change that — try again.", { tone: 'danger' });
     }
   }
 

@@ -1,12 +1,14 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-type Migration = (db: SQLiteDatabase) => void;
+type Migration = (db: SQLiteDatabase) => Promise<void>;
 
-// Append-only. Never edit a migration once it has shipped — a year of
-// nightly logs depends on every past migration still running verbatim.
+// Append-only. Never edit a migration's SQL once it has shipped — a year of
+// nightly logs depends on every past migration still running verbatim. (The
+// first one moved from execSync to execAsync with the async migration; its SQL
+// is untouched.)
 const migrations: Migration[] = [
-  (db) => {
-    db.execSync(`
+  async (db) => {
+    await db.execAsync(`
       CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY,
         name TEXT NOT NULL,
@@ -53,12 +55,18 @@ const migrations: Migration[] = [
   },
 ];
 
-export function runMigrations(db: SQLiteDatabase): void {
-  const row = db.getFirstSync<{ user_version: number }>('PRAGMA user_version');
-  let version = row?.user_version ?? 0;
-  for (let i = version; i < migrations.length; i++) {
-    migrations[i](db);
-    version = i + 1;
-    db.execSync(`PRAGMA user_version = ${version}`);
+/** What a fully migrated database reports as `PRAGMA user_version`. */
+export const SCHEMA_VERSION = migrations.length;
+
+export async function runMigrations(db: SQLiteDatabase): Promise<void> {
+  const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
+  const from = row?.user_version ?? 0;
+  for (let i = from; i < migrations.length; i++) {
+    // One transaction per step: a migration that dies halfway leaves the old
+    // schema and the old version number, never half of each.
+    await db.withTransactionAsync(async () => {
+      await migrations[i](db);
+      await db.execAsync(`PRAGMA user_version = ${i + 1}`);
+    });
   }
 }

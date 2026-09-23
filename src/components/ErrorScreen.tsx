@@ -1,9 +1,22 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ALREADY_OPEN } from '@/db/init';
 import { colors, font, radius, spacing, type } from '@/lib/colors';
 
 /** Shown by the router's error boundary instead of a white screen with no way back. */
 export function ErrorScreen({ error, retry }: { error: Error; retry: () => void }) {
+  if (error.name === ALREADY_OPEN) {
+    return (
+      <View style={styles.screen}>
+        <Text style={styles.title}>Open somewhere else</Text>
+        <Text style={styles.body}>{error.message}</Text>
+        <Pressable style={styles.button} onPress={retry} accessibilityRole="button">
+          <Text style={styles.buttonLabel}>Try again</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
       <Text style={styles.title}>Something broke</Text>
@@ -14,7 +27,7 @@ export function ErrorScreen({ error, retry }: { error: Error; retry: () => void 
       <Text style={styles.detail} numberOfLines={4}>
         {error.message}
       </Text>
-      <Pressable style={styles.button} onPress={retry}>
+      <Pressable style={styles.button} onPress={retry} accessibilityRole="button">
         <Text style={styles.buttonLabel}>Try again</Text>
       </Pressable>
     </View>

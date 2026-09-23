@@ -1,24 +1,19 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 
-import { getSetting, setSetting } from '@/db/settings';
-import { safeRead } from '@/db/safeRead';
-import { useDbVersion } from './DbVersionContext';
+import { listSettings, setSetting } from '@/db/settings';
+import { useWrite } from './DbVersionContext';
+import { useDbQuery } from './useDbQuery';
 
-export function useSetting(key: string, fallback: string): [string, (value: string) => void] {
-  const { version, bump } = useDbVersion();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const value = useMemo(() => safeRead(`setting:${key}`, () => getSetting(key) ?? fallback, fallback), [key, fallback, version]);
+export const SETTINGS_KEY = 'settings';
+const NONE: Record<string, string> = {};
 
-  const set = useCallback(
-    (next: string) => {
-      try {
-        setSetting(key, next);
-      } finally {
-        bump();
-      }
-    },
-    [key, bump]
-  );
-
-  return [value, set];
+/**
+ * Primed at startup (see _layout), so the stored value is there on the first
+ * render — no flash of PHP before someone's USD, no 1h default before their 30m.
+ */
+export function useSetting(key: string, fallback: string): [string, (value: string) => Promise<void>] {
+  const write = useWrite();
+  const all = useDbQuery(SETTINGS_KEY, listSettings, NONE).data;
+  const set = useCallback((next: string) => write(() => setSetting(key, next)), [key, write]);
+  return [all[key] ?? fallback, set];
 }

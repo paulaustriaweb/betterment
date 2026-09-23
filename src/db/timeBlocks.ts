@@ -21,18 +21,16 @@ function toTimeBlock(row: TimeBlockRow): TimeBlock {
   };
 }
 
-export function listTimeBlocksForRange(rangeStartIso: string, rangeEndIso: string): TimeBlock[] {
-  const db = getDb();
-  const rows = db.getAllSync<TimeBlockRow>(
+export async function listTimeBlocksForRange(rangeStartIso: string, rangeEndIso: string): Promise<TimeBlock[]> {
+  const rows = await getDb().getAllAsync<TimeBlockRow>(
     'SELECT * FROM time_blocks WHERE start_time < ? AND end_time > ? ORDER BY start_time ASC',
     [rangeEndIso, rangeStartIso]
   );
   return rows.map(toTimeBlock);
 }
 
-export function getLastTimeBlock(): TimeBlock | null {
-  const db = getDb();
-  const row = db.getFirstSync<TimeBlockRow>('SELECT * FROM time_blocks ORDER BY end_time DESC LIMIT 1');
+export async function getLastTimeBlock(): Promise<TimeBlock | null> {
+  const row = await getDb().getFirstAsync<TimeBlockRow>('SELECT * FROM time_blocks ORDER BY end_time DESC LIMIT 1');
   return row ? toTimeBlock(row) : null;
 }
 
@@ -43,39 +41,36 @@ export interface TimeBlockInput {
   note: string | null;
 }
 
-export function insertTimeBlock(input: TimeBlockInput): number {
+export async function insertTimeBlock(input: TimeBlockInput): Promise<number> {
   const db = getDb();
+  const same = [input.startTime, input.endTime, input.categoryId];
 
   // The same category over the exact same minutes is one entry, never two, so a
-  // repeated save returns what is already there rather than adding a copy. The
-  // debounce upstairs only covers fast double-taps; this covers a deliberate
-  // retry after a save that looked like it failed but had already written.
-  const duplicate = db.getFirstSync<{ id: number }>(
+  // repeated save keeps what is already there rather than adding a copy. The check
+  // and the insert are one statement: as two awaits, a second save could slip in
+  // between them and both would pass.
+  const result = await db.runAsync(
+    `INSERT INTO time_blocks (start_time, end_time, category_id, note, created_at)
+     SELECT ?, ?, ?, ?, ?
+     WHERE NOT EXISTS (SELECT 1 FROM time_blocks WHERE start_time = ? AND end_time = ? AND category_id = ?)`,
+    [...same, input.note, new Date().toISOString(), ...same]
+  );
+  if (result.changes > 0) return result.lastInsertRowId;
+
+  const existing = await db.getFirstAsync<{ id: number }>(
     'SELECT id FROM time_blocks WHERE start_time = ? AND end_time = ? AND category_id = ? LIMIT 1',
-    [input.startTime, input.endTime, input.categoryId]
+    same
   );
-  if (duplicate) return duplicate.id;
-
-  const now = new Date().toISOString();
-  const result = db.runSync(
-    'INSERT INTO time_blocks (start_time, end_time, category_id, note, created_at) VALUES (?, ?, ?, ?, ?)',
-    [input.startTime, input.endTime, input.categoryId, input.note, now]
-  );
-  return result.lastInsertRowId;
+  return existing?.id ?? 0;
 }
 
-export function updateTimeBlock(id: number, input: TimeBlockInput): void {
-  const db = getDb();
-  db.runSync('UPDATE time_blocks SET start_time = ?, end_time = ?, category_id = ?, note = ? WHERE id = ?', [
-    input.startTime,
-    input.endTime,
-    input.categoryId,
-    input.note,
-    id,
-  ]);
+export async function updateTimeBlock(id: number, input: TimeBlockInput): Promise<void> {
+  await getDb().runAsync(
+    'UPDATE time_blocks SET start_time = ?, end_time = ?, category_id = ?, note = ? WHERE id = ?',
+    [input.startTime, input.endTime, input.categoryId, input.note, id]
+  );
 }
 
-export function deleteTimeBlock(id: number): void {
-  const db = getDb();
-  db.runSync('DELETE FROM time_blocks WHERE id = ?', [id]);
+export async function deleteTimeBlock(id: number): Promise<void> {
+  await getDb().runAsync('DELETE FROM time_blocks WHERE id = ?', [id]);
 }

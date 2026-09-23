@@ -3,9 +3,9 @@ import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 let db: SQLiteDatabase | null = null;
 
 /**
- * Opening is async even though every query below is sync, because on web the sync
- * API blocks the main thread waiting on a worker — and that worker has to compile
- * its wasm build first. Opening synchronously there times out before it ever boots.
+ * Async only, everywhere. On web the sync API busy-spins the main thread on an
+ * Atomics lock while a worker runs the query — which timed out after writes had
+ * landed, froze every tab at once, and could starve the very worker it waited on.
  */
 export async function openDb(): Promise<SQLiteDatabase> {
   if (!db) db = await openDatabaseAsync('betterment.db');

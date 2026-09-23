@@ -20,10 +20,13 @@ export function ReminderSheet({ visible, onClose }: { visible: boolean; onClose:
   const [time, setTime] = useSetting('reminder_time', '23:30');
   const [enabled, setEnabled] = useSetting('reminder_enabled', '0');
   const [denied, setDenied] = useState(false);
+  // What the steppers show while a write is in flight. Stepping from the stored
+  // value alone would lose a quick second tap — both would start from the same time.
+  const [pendingTime, setPendingTime] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const toast = useToast();
 
-  const { hour, minute } = parseReminderTime(time);
+  const { hour, minute } = parseReminderTime(pendingTime ?? time);
   const on = enabled === '1' && remindersSupported;
 
   async function apply(nextOn: boolean, h: number, m: number) {
@@ -34,12 +37,12 @@ export function ReminderSheet({ visible, onClose }: { visible: boolean; onClose:
     }
     const scheduled = await scheduleNightlyReminder(h, m);
     setDenied(!scheduled);
-    if (!scheduled) setEnabled('0');
+    if (!scheduled) await setEnabled('0');
   }
 
-  function toggle(next: boolean) {
+  async function toggle(next: boolean) {
     try {
-      setEnabled(next ? '1' : '0');
+      await setEnabled(next ? '1' : '0');
       setError(null);
       toast(next ? 'Reminder on.' : 'Reminder off.');
     } catch (e) {
@@ -47,22 +50,25 @@ export function ReminderSheet({ visible, onClose }: { visible: boolean; onClose:
       setError("Couldn't save that — try again.");
       return;
     }
-    void apply(next, hour, minute);
+    apply(next, hour, minute).catch((e: unknown) => console.error('reminder schedule failed', e));
   }
 
-  function shift(delta: number) {
+  async function shift(delta: number) {
     const total = (hour * 60 + minute + delta + 1440) % 1440;
     const h = Math.floor(total / 60);
     const m = total % 60;
+    const next = formatReminderTime(h, m);
+    setPendingTime(next);
     try {
-      setTime(formatReminderTime(h, m));
+      await setTime(next);
       setError(null);
     } catch (e) {
       console.error('reminder time save failed', e);
+      setPendingTime(null);
       setError("Couldn't save that — try again.");
       return;
     }
-    if (on) void apply(true, h, m);
+    if (on) apply(true, h, m).catch((e: unknown) => console.error('reminder schedule failed', e));
   }
 
   return (

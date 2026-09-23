@@ -66,22 +66,33 @@ export default function LogScreen() {
   // which date an entry lands on. It is not always today — Your day can hand over
   // a past date, and writing that to today would silently corrupt both days.
   const [day, setDay] = useState(() => startOfDay(now));
-  const { blocks, add, update, remove } = useTimeBlocksForDay(day);
+  const { blocks, ready: blocksReady, add, update, remove } = useTimeBlocksForDay(day);
   const isToday = isSameDay(day, now);
-
-  const defaultStart = useMemo(() => {
-    const minutes = isToday
-      ? lastBlockEndOnDay(lastBlock, day) ?? differenceInMinutes(now, day)
-      : // Filling a past day in after the fact: carry on from its last entry.
-        blocks.reduce((max, b) => Math.max(max, differenceInMinutes(new Date(b.endTime), day)), 0);
-    return clampStart(minutes);
-  }, [isToday, lastBlock, blocks, now, day]);
 
   const [defaultDurationSetting] = useSetting('default_duration', '60');
   const defaultDuration = clampDuration(Number(defaultDurationSetting) || 60);
 
-  const [startMin, setStartMin] = useState(defaultStart);
-  const [durMin, setDurMin] = useState(defaultDuration);
+  const defaultStart = useMemo(() => {
+    const minutes = isToday
+      ? // Nothing to carry on from: end at now. This logs what was just done — it
+        // used to start at now, which put a fresh entry an hour into the future.
+        lastBlockEndOnDay(lastBlock, day) ?? differenceInMinutes(now, day) - defaultDuration
+      : // Filling a past day in after the fact: carry on from its last entry.
+        blocks.reduce((max, b) => Math.max(max, differenceInMinutes(new Date(b.endTime), day)), 0);
+    return clampStart(minutes);
+  }, [isToday, lastBlock, blocks, now, day, defaultDuration]);
+
+  // null = untouched, follow the default. Data loads after the first render now, so
+  // a start captured once at mount would miss where the last entry ended.
+  const [startChoice, setStartMin] = useState<number | null>(null);
+  const [durChoice, setDurMin] = useState<number | null>(null);
+  const startMin = startChoice ?? defaultStart;
+  // Untouched, today's entry stops at now — 12:17 AM with a 1h default is 12:00 to
+  // 12:17, not an entry that runs 43 minutes into the future.
+  const fittedDuration = isToday
+    ? Math.max(STEP, Math.min(defaultDuration, differenceInMinutes(now, day) - startMin))
+    : defaultDuration;
+  const durMin = durChoice ?? fittedDuration;
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
@@ -89,7 +100,7 @@ export default function LogScreen() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [pendingEdit, setPendingEdit] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const allowSubmit = useSubmitGuard();
+  const submit = useSubmitGuard();
   const toast = useToast();
 
   // Arriving from Your day: `date` says which day to write to, a tapped gap prefills
@@ -112,11 +123,12 @@ export default function LogScreen() {
     setEditingId(null);
     const start = finite(params.start);
     const dur = finite(params.dur);
-    if (start !== null) setStartMin(clampStart(start));
-    if (dur !== null) setDurMin(clampDuration(dur));
+    setStartMin(start !== null ? clampStart(start) : null);
+    setDurMin(dur !== null ? clampDuration(dur) : null);
     setPendingEdit(finite(params.edit));
-  } else if (pendingEdit !== null) {
-    // Runs on the following render, once `blocks` has been re-read for the new day.
+  } else if (pendingEdit !== null && blocksReady) {
+    // Waits for the new day's entries to load — acting on the old day's list
+    // would miss the entry and silently drop the edit.
     const block = blocks.find((b) => b.id === pendingEdit);
     setPendingEdit(null);
     if (block) startEditing(block);
@@ -151,24 +163,22 @@ export default function LogScreen() {
     setDurMin(nextDur);
   }
 
-  function resetForm(nextStart: number = defaultStart) {
+  /** No start given: follow the default for whatever day is showing. */
+  function resetForm(nextStart?: number) {
     setEditingId(null);
-    setStartMin(clampStart(nextStart));
-    setDurMin(defaultDuration);
+    setStartMin(nextStart === undefined ? null : clampStart(nextStart));
+    setDurMin(null);
     setCategoryId(null);
     setNote('');
     setNoteOpen(false);
   }
 
   function goToToday() {
-    const todayStart = startOfDay(now);
-    setDay(todayStart);
-    // defaultStart is still memoised on the old day, so pass the start explicitly.
-    resetForm(differenceInMinutes(now, todayStart));
+    setDay(startOfDay(now));
+    resetForm();
   }
 
   function handleSave() {
-    if (!allowSubmit()) return;
     if (!categoryId) {
       setNotice('Pick a category first — what were you doing?');
       return;
@@ -179,22 +189,28 @@ export default function LogScreen() {
       categoryId,
       note: note.trim() || null,
     };
-    try {
-      if (editingId) {
-        update(editingId, input);
-        resetForm();
-      } else {
-        add(input);
-        // Chain to the end of the block just saved. defaultStart is memoised on
-        // lastBlock and still holds its pre-save value during this handler.
-        resetForm(startMin + durMin);
+    // Captured now: by the time the write resolves, the form has moved on.
+    const wasEditing = editingId;
+    const minutes = durMin;
+    const chainFrom = startMin + durMin;
+    submit(async () => {
+      try {
+        if (wasEditing) {
+          await update(wasEditing, input);
+          resetForm();
+        } else {
+          await add(input);
+          // Chain to the end of the entry just saved.
+          resetForm(chainFrom);
+        }
+        setNotice(null);
+        toast(wasEditing ? 'Entry updated.' : `Logged ${formatDuration(minutes)}.`);
+      } catch (error) {
+        console.error('save failed', error);
+        setNotice("Couldn't save that — try again.");
+        toast("Couldn't save that — try again.", { tone: 'danger' });
       }
-      setNotice(null);
-      toast(editingId ? 'Entry updated.' : `Logged ${formatDuration(durMin)}.`);
-    } catch (error) {
-      console.error('save failed', error);
-      setNotice("Couldn't save that — try again.");
-    }
+    });
   }
 
   function startEditing(block: TimeBlock) {
@@ -215,10 +231,10 @@ export default function LogScreen() {
     setListOpen(false);
   }
 
-  function handleDelete(id: number) {
+  async function handleDelete(id: number) {
     const gone = blocks.find((b) => b.id === id);
     try {
-      remove(id);
+      await remove(id);
       if (editingId === id) resetForm();
       setNotice(null);
       if (gone) {
@@ -238,6 +254,8 @@ export default function LogScreen() {
     } catch (error) {
       console.error('delete failed', error);
       setNotice("Couldn't delete that — try again.");
+      // The list is in a sheet, over the inline notice — the toast is what's seen.
+      toast("Couldn't delete that — try again.", { tone: 'danger' });
     }
   }
 

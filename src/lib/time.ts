@@ -57,22 +57,38 @@ export function unaccountedHours(blocks: TimeBlock[], day: Date): number {
   return unaccountedMinutes(blocks, day) / 60;
 }
 
-/** The unlogged stretches of a day, in minutes from midnight. The product's whole point. */
-export function findGaps(blocks: TimeBlock[], day: Date): Span[] {
+/**
+ * The later of the two is still in the future. Time that hasn't happened yet can't
+ * be logged, so it must never count as "not logged" — at 8 AM with nothing logged
+ * the honest answer is 8h, not 24h.
+ */
+export function capAtNow(end: Date, now: Date): Date {
+  return end < now ? end : now;
+}
+
+/**
+ * The unlogged stretches of a day, in minutes from midnight. The product's whole point.
+ * Pass `until` to stop at that moment — today's gaps end at now, not midnight.
+ */
+export function findGaps(blocks: TimeBlock[], day: Date, until?: Date): Span[] {
   const dayStart = startOfDay(day);
+  const limit = until
+    ? Math.min(MINUTES_PER_DAY, Math.max(0, differenceInMinutes(until, dayStart)))
+    : MINUTES_PER_DAY;
   const spans = merge(clampToRange(blocks, dayStart, addDays(dayStart, 1)));
   const gaps: Span[] = [];
   let cursor = 0;
   for (const span of spans) {
+    if (span.start >= limit) break;
     if (span.start > cursor) gaps.push({ start: cursor, end: span.start });
     cursor = Math.max(cursor, span.end);
   }
-  if (cursor < MINUTES_PER_DAY) gaps.push({ start: cursor, end: MINUTES_PER_DAY });
+  if (cursor < limit) gaps.push({ start: cursor, end: limit });
   return gaps;
 }
 
-export function longestGapMinutes(blocks: TimeBlock[], day: Date): number {
-  return findGaps(blocks, day).reduce((max, g) => Math.max(max, g.end - g.start), 0);
+export function longestGapMinutes(blocks: TimeBlock[], day: Date, until?: Date): number {
+  return findGaps(blocks, day, until).reduce((max, g) => Math.max(max, g.end - g.start), 0);
 }
 
 /** Logged minutes per category id across a range. Overlaps are counted per category as-is. */

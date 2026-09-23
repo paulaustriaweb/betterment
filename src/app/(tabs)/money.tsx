@@ -47,6 +47,7 @@ export default function MoneyScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const toast = useToast();
   const [currency] = useSetting('currency', 'PHP');
+  const [weekStartSetting] = useSetting('week_starts_on', '0');
 
   const { rangeStart, rangeEnd } = useMemo(() => {
     if (range === 'last') {
@@ -61,7 +62,7 @@ export default function MoneyScreen() {
     return { rangeStart: s, rangeEnd: addMonths(s, 1) };
   }, [range, now]);
 
-  const { transactions, add, update, remove } = useTransactionsForRange(rangeStart, rangeEnd);
+  const { transactions, loaded, add, update, remove } = useTransactionsForRange(rangeStart, rangeEnd);
 
   const spent = sumByType(transactions, 'expense');
   const earned = sumByType(transactions, 'income');
@@ -81,10 +82,10 @@ export default function MoneyScreen() {
     return cumulative(perBucket);
   }, [transactions, rangeStart, rangeEnd, range]);
 
-  function handleDelete(id: number) {
+  async function handleDelete(id: number) {
     const gone = transactions.find((t) => t.id === id);
     try {
-      remove(id);
+      await remove(id);
       setNotice(null);
       if (gone) {
         toast(`Deleted ${transactionLabel(gone)}.`, {
@@ -106,6 +107,7 @@ export default function MoneyScreen() {
       // An unhandled throw here left the row sitting there looking frozen.
       console.error('transaction delete failed', error);
       setNotice("Couldn't delete that — try again.");
+      toast("Couldn't delete that — try again.", { tone: 'danger' });
     }
   }
 
@@ -113,6 +115,9 @@ export default function MoneyScreen() {
   const rangeLabel = RANGES.find((r) => r.key === range)?.label ?? 'This month';
   const periodLabel =
     range === 'year' ? format(rangeStart, 'yyyy') : format(rangeStart, 'MMMM yyyy');
+
+  // Hold the figures back until the first read lands, rather than flash ₱0.
+  if (!loaded) return <View style={styles.screen} />;
 
   return (
     <View style={styles.screen}>
@@ -146,7 +151,7 @@ export default function MoneyScreen() {
 
           {trend.length > 1 ? (
             <View style={styles.spark}>
-              <Sparkline values={trend} label={transactions.length === 0 ? '—' : formatCurrency(net, currency)} />
+              <Sparkline values={trend} label={transactions.length === 0 ? '—' : formatSigned(net, currency)} />
             </View>
           ) : (
             <Text style={styles.heroEmpty}>Nothing added {rangeLabel.toLowerCase()} yet.</Text>
@@ -231,7 +236,10 @@ export default function MoneyScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.rowLabel}>{label}</Text>
-                      <Text style={styles.rowDate}>{format(new Date(t.date), 'MMM d')}</Text>
+                      <Text style={styles.rowDate} numberOfLines={1}>
+                        {format(new Date(t.date), 'MMM d')}
+                        {t.note ? ` · ${t.note}` : ''}
+                      </Text>
                     </View>
                     <Text
                       style={[styles.rowAmount, t.type === 'income' && styles.rowAmountIn]}
@@ -252,13 +260,14 @@ export default function MoneyScreen() {
         visible={addOpen}
         currency={currency}
         editing={transactions.find((t) => t.id === editingId) ?? null}
+        weekStartsOn={weekStartSetting === '1' ? 1 : 0}
         onClose={() => setAddOpen(false)}
-        onSubmit={(input, id) => {
+        onSubmit={async (input, id) => {
           if (id) {
-            update(id, input);
+            await update(id, input);
             toast('Transaction updated.');
           } else {
-            add(input);
+            await add(input);
             toast(`Added ${formatCurrency(input.amount, currency)}.`);
           }
         }}

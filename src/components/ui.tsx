@@ -63,6 +63,7 @@ export function RangePills({
             onPress={() => onChange(o.key)}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
+            accessibilityLabel={o.label}
             style={[styles.pill, { backgroundColor: active ? colors.rose : colors.surface }]}
           >
             <Text style={[styles.pillLabel, { color: active ? colors.surface : colors.inkSoft }]}>{o.label}</Text>

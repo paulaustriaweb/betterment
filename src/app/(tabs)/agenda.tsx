@@ -1,8 +1,19 @@
-import { addDays, addMinutes, differenceInMinutes, format, isSameDay, startOfDay, startOfWeek } from 'date-fns';
+import {
+  addDays,
+  addMinutes,
+  addWeeks,
+  differenceInMinutes,
+  format,
+  isSameDay,
+  startOfDay,
+  startOfWeek,
+  subWeeks,
+} from 'date-fns';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons';
 import { ScreenHeader } from '@/components/ui';
 import { useCategories } from '@/hooks/useCategories';
 import { useNow } from '@/hooks/useNow';
@@ -27,8 +38,10 @@ export default function AgendaScreen() {
   const [weekStartSetting] = useSetting('week_starts_on', '0');
   const weekStartsOn = weekStartSetting === '1' ? 1 : 0;
   const categories = useCategories();
-  const blocks = useTimeBlocksForDay(selected).blocks;
-  const gaps = useMemo(() => findGaps(blocks, selected), [blocks, selected]);
+  const { blocks, loaded } = useTimeBlocksForDay(selected);
+  // Stops at now: an hour that hasn't happened can't be logged, so it isn't a gap.
+  // Nothing until the first read lands — a whole day of dashed gaps would flash.
+  const gaps = useMemo(() => (loaded ? findGaps(blocks, selected, now) : []), [loaded, blocks, selected, now]);
 
   const isToday = isSameDay(selected, now);
   const nowMinutes = differenceInMinutes(now, startOfDay(now));
@@ -39,6 +52,16 @@ export default function AgendaScreen() {
     const start = startOfWeek(selected, { weekStartsOn });
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   }, [selected, weekStartsOn]);
+
+  // Without these the strip was stuck on this week, so last Saturday became
+  // impossible to fill in the moment Sunday started. No going past this week:
+  // nothing in the future can be logged.
+  const onThisWeek = isSameDay(startOfWeek(selected, { weekStartsOn }), startOfWeek(now, { weekStartsOn }));
+  const today = startOfDay(now);
+  function shiftWeek(direction: -1 | 1) {
+    const next = direction === -1 ? subWeeks(selected, 1) : addWeeks(selected, 1);
+    setSelected(next > today ? today : next);
+  }
 
   useEffect(() => {
     // Open on the current hour rather than midnight — nobody logs at 3am. The clock
@@ -56,7 +79,32 @@ export default function AgendaScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <ScreenHeader title="Your day" subtitle={format(selected, 'MMMM yyyy')} />
+        <ScreenHeader
+          title="Your day"
+          subtitle={format(selected, 'MMMM yyyy')}
+          right={
+            <View style={styles.weekNav}>
+              <Pressable
+                style={styles.weekNavButton}
+                onPress={() => shiftWeek(-1)}
+                accessibilityRole="button"
+                accessibilityLabel="Previous week"
+              >
+                <ChevronLeftIcon color={colors.rose} />
+              </Pressable>
+              {onThisWeek ? null : (
+                <Pressable
+                  style={styles.weekNavButton}
+                  onPress={() => shiftWeek(1)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Next week"
+                >
+                  <ChevronRightIcon color={colors.rose} />
+                </Pressable>
+              )}
+            </View>
+          }
+        />
 
         <View style={styles.weekStrip}>
           {week.map((d) => {
@@ -178,6 +226,16 @@ export default function AgendaScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.ground },
   header: { paddingTop: 26, paddingHorizontal: spacing.gutter },
+
+  weekNav: { flexDirection: 'row', gap: 8 },
+  weekNavButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   weekStrip: { flexDirection: 'row', gap: 4, marginTop: 15 },
   weekDay: { flex: 1, alignItems: 'center', gap: 7, paddingVertical: 4 },

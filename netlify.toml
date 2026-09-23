@@ -19,6 +19,13 @@
     Cross-Origin-Opener-Policy = "same-origin"
     Cross-Origin-Embedder-Policy = "require-corp"
 
+# The service worker must never be served stale, or a fix can't reach an
+# installed app until the browser's own 24h check.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
 [[headers]]
   for = "/manifest.webmanifest"
   [headers.values]

@@ -7,13 +7,17 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, PanResponder, Pressable, StyleSheet, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, font, motion, radius, spacing } from '@/lib/colors';
+import { CloseIcon } from './icons';
+import { ToastLayer } from './ToastLayer';
 
 export interface ToastAction {
   label: string;
-  onPress: () => void;
+  /** May be async — a rejection is reported rather than swallowed. */
+  onPress: () => unknown;
 }
 
 interface ToastOptions {
@@ -58,6 +62,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     timer.current = setTimeout(() => setToast(null), ms);
   }, []);
 
+  // Undo is a write like any other. Unguarded, a failed one threw out of a press
+  // handler and said nothing.
+  const runAction = useCallback(
+    async (action: ToastAction) => {
+      dismiss();
+      try {
+        await action.onPress();
+      } catch (error) {
+        console.error(`toast action failed: ${action.label}`, error);
+        show(`Couldn't ${action.label.toLowerCase()} that — try again.`, { tone: 'danger' });
+      }
+    },
+    [dismiss, show]
+  );
+
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
   }, []);
@@ -65,14 +84,49 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={show}>
       {children}
-      {toast ? <ToastView key={toast.key} current={toast} onDismiss={dismiss} /> : null}
+      {toast ? <ToastView key={toast.key} current={toast} onDismiss={dismiss} onAction={runAction} /> : null}
     </ToastContext.Provider>
   );
 }
 
-function ToastView({ current, onDismiss }: { current: Current; onDismiss: () => void }) {
+function ToastView({
+  current,
+  onDismiss,
+  onAction,
+}: {
+  current: Current;
+  onDismiss: () => void;
+  onAction: (action: ToastAction) => void;
+}) {
   const [slide] = useState(() => new Animated.Value(0));
+  const [drag] = useState(() => new Animated.ValueXY());
+  const insets = useSafeAreaInsets();
   const { message, options } = current;
+  const action = options?.action;
+
+  // Flick it sideways or up to get rid of it. Move-only, so a tap still reaches
+  // Undo and the close button.
+  const [swipe] = useState(() =>
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 6 || g.dy < -6,
+      onPanResponderMove: (_, g) => drag.setValue({ x: g.dx, y: Math.min(0, g.dy) }),
+      onPanResponderRelease: (_, g) => {
+        const sideways = Math.abs(g.dx) > 70 || Math.abs(g.vx) > 0.5;
+        const upwards = g.dy < -24 || g.vy < -0.5;
+        if (!sideways && !upwards) {
+          Animated.spring(drag, { toValue: { x: 0, y: 0 }, useNativeDriver: true }).start();
+          return;
+        }
+        Animated.timing(drag, {
+          toValue: sideways ? { x: Math.sign(g.dx || g.vx) * 480, y: 0 } : { x: 0, y: -140 },
+          duration: motion.quick,
+          useNativeDriver: true,
+        }).start(onDismiss);
+      },
+      onPanResponderTerminate: () =>
+        Animated.spring(drag, { toValue: { x: 0, y: 0 }, useNativeDriver: true }).start(),
+    })
+  );
 
   useEffect(() => {
     Animated.timing(slide, {
@@ -83,55 +137,61 @@ function ToastView({ current, onDismiss }: { current: Current; onDismiss: () => 
   }, [slide]);
 
   const danger = options?.tone === 'danger';
+  const fade = drag.x.interpolate({ inputRange: [-240, 0, 240], outputRange: [0, 1, 0], extrapolate: 'clamp' });
 
   return (
-    // Its own Modal so it floats above the sheets — most of what it reports
-    // happens inside one, and anything in the app tree renders behind them.
-    <Modal transparent visible animationType="none" onRequestClose={onDismiss}>
-      <View style={styles.layer} pointerEvents="box-none">
-        <Animated.View
-          style={[
-            styles.toast,
-            danger && styles.toastDanger,
-            {
-              opacity: slide,
-              transform: [{ translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-            },
-          ]}
+    // At the top, clear of the primary action at the bottom of every screen, so the
+    // next thing can be done while this is still showing.
+    <ToastLayer>
+      <Animated.View
+        {...swipe.panHandlers}
+        style={[
+          styles.toast,
+          danger && styles.toastDanger,
+          {
+            marginTop: insets.top + 10,
+            opacity: Animated.multiply(slide, fade),
+            transform: [
+              { translateX: drag.x },
+              { translateY: Animated.add(slide.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }), drag.y) },
+            ],
+          },
+        ]}
+      >
+        <Text style={styles.message} numberOfLines={2} accessibilityLiveRegion="polite">
+          {message}
+        </Text>
+        {action ? (
+          <Pressable
+            onPress={() => onAction(action)}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+            style={styles.action}
+            hitSlop={8}
+          >
+            <Text style={styles.actionLabel}>{action.label}</Text>
+          </Pressable>
+        ) : null}
+        <Pressable
+          onPress={onDismiss}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss"
+          style={styles.close}
+          hitSlop={10}
         >
-          <Text style={styles.message} numberOfLines={2}>
-            {message}
-          </Text>
-          {options?.action ? (
-            <Pressable
-              onPress={() => {
-                options.action?.onPress();
-                onDismiss();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={options.action.label}
-              style={styles.action}
-              hitSlop={8}
-            >
-              <Text style={styles.actionLabel}>{options.action.label}</Text>
-            </Pressable>
-          ) : (
-            <Pressable onPress={onDismiss} accessibilityRole="button" accessibilityLabel="Dismiss" hitSlop={8}>
-              <Text style={styles.dismiss}>Close</Text>
-            </Pressable>
-          )}
-        </Animated.View>
-      </View>
-    </Modal>
+          <CloseIcon color="rgba(255,255,255,0.75)" size={14} />
+        </Pressable>
+      </Animated.View>
+    </ToastLayer>
   );
 }
 
 const styles = StyleSheet.create({
-  layer: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: spacing.gutter, paddingBottom: 104 },
   toast: {
+    marginHorizontal: spacing.gutter,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 12,
     backgroundColor: colors.ink,
     borderRadius: radius.control + 4,
     paddingVertical: 14,
@@ -141,5 +201,13 @@ const styles = StyleSheet.create({
   message: { flex: 1, fontFamily: font.medium, fontSize: 13, color: colors.surface, lineHeight: 18 },
   action: { paddingVertical: 2 },
   actionLabel: { fontFamily: font.bold, fontSize: 13, color: colors.rosePop },
-  dismiss: { fontFamily: font.semibold, fontSize: 12.5, color: 'rgba(255,255,255,0.65)' },
+  close: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: -6,
+  },
 });
