@@ -35,6 +35,8 @@ const REPLACEMENTS = [
   },
   {
     name: 'iteration-count timeout',
+    // Any budget counts as applied — the exact number is set by the rule below.
+    applied: `const deadline = Date.now() +`,
     find: `  while (Atomics.load(lock, 0) === PENDING) {
     ++i;
 
@@ -65,6 +67,14 @@ const REPLACEMENTS = [
     }
   }`,
   },
+  {
+    // Separate rule so it also rewrites a node_modules the CI cache restored with
+    // the old budget. 5s meant a slow write froze the UI for five seconds before
+    // giving up; reads fall back safely now, so failing fast is the better trade.
+    name: 'timeout budget',
+    find: `const deadline = Date.now() + 5000;`,
+    replace: `const deadline = Date.now() + 1200;`,
+  },
 ];
 
 function main() {
@@ -83,8 +93,8 @@ function main() {
   let patched = original;
   let applied = 0;
   let skipped = 0;
-  for (const { name, find, replace } of REPLACEMENTS) {
-    if (patched.includes(replace)) {
+  for (const { name, find, replace, applied: appliedMarker } of REPLACEMENTS) {
+    if (patched.includes(appliedMarker ?? replace)) {
       skipped += 1;
       continue;
     }
