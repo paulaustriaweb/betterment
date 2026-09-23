@@ -429,46 +429,96 @@ currency validation. There are no component tests; the UI was checked by using i
 
 ---
 
-## 12. Open items, in the order they should be done
+## 12. Open items — read this before touching anything
 
-Items 1–5 from the previous handover are **done** (2026-09-22), along with §13's web-build
-test that gated them. What changed, so a fresh session doesn't redo it:
+### 1. Migrate `src/db` and the hooks to expo-sqlite's **async** API. Do this first.
 
-- **Logging a past day now works.** `Day` passes the selected `date` (and, for a tapped
-  entry, its `edit` id) through to Log, which holds a `day` in state instead of assuming
-  today. Log's header names the day and offers a "Today" pill to get back; "End now" hides
-  on a past day because it is meaningless there.
-- **Backup exists.** Settings → *Back up my data* writes every table to JSON — a file
-  download on web, the share sheet on native (`src/lib/backup.ts`). One-way by design;
-  there is no restore.
-- **Error boundary exists.** `ErrorBoundary` in `src/app/_layout.tsx` renders
-  `ErrorScreen` instead of a white screen, with a retry.
-- **Settings are reachable**, behind the gear on Overview (it replaced the bell; the
-  Reminder sheet is now one row inside it). Currency is editable and validated, categories
-  can be renamed and hidden.
-- **Accessibility**: roles, labels and selected/checked state on every icon-only and
-  chip-style control. `Stepper` now *requires* a `label` — a bare plus sign told a screen
-  reader nothing.
+This is the single most important task and the cause of nearly every bug reported
+from real use. Everything below it is smaller.
 
-**What is actually left, in order:**
+`expo-sqlite`'s sync API on web (`getAllSync`, `runSync`) does not run SQLite on the
+main thread. It posts to a worker and then **busy-spins the main thread** on an
+`Atomics` lock until the worker answers. On a phone that design fails in four ways,
+all of which were hit on device:
 
-**1. Open the web build on a real iPhone.** Everything in §13 was verified in a desktop
-Chromium browser. iOS Safari is the shipping platform and the one most likely to differ —
-OPFS behaviour, the `require-corp` header, Add to Home Screen, and whether the sync bridge
-stays responsive after the app has been backgrounded. Deploy `dist/` somewhere with the two
-headers set and use it for a night.
+- the wait had a budget of ~20-40ms, so writes threw `Sync operation timeout` *after*
+  the worker had already committed them — data saved, UI stale, button looked dead
+- a throw from a read happens **during render**, which the error boundary turns into
+  a full-screen crash
+- every write bumps one shared counter, re-querying every hook on every mounted tab
+  — about ten blocking round-trips per save. If the worker stalls, that was ten
+  timeouts back to back: a multi-second freeze on all five tabs at once
+- the main thread never yields while spinning, so on a low-power device it can starve
+  the very worker it is waiting for
 
-**2. Decide what a restore looks like.** Backup is one-way. On web, "clear website data"
-erases everything, and there is no way back in even holding the JSON. An import that reads
-a file and replays inserts is maybe sixty lines and is the natural next feature.
+**Everything currently in place around this is containment, not a cure** (see the
+invariants below). Async removes the blocking entirely. Expect to touch: `src/db/*`
+(every query becomes `await`), the five domain hooks (`useMemo` reads become
+state loaded in an effect), and the screens that assume data is present on first
+render. `safeRead` and the timeout patch can then be deleted.
 
-**3. Categories can only be renamed or hidden, not added.** Fine for now — the colours are
-design tokens, not free choices — but someone cloning this may want a ninth category.
+### 2. Clean up duplicate records
+Repeated taps during the dead-button period created duplicates in real data. Inserts
+are idempotent now, but the existing rows are still there. A "Remove duplicate
+entries" action in Settings — one `DELETE` keeping `MIN(id)` per identical
+`(start_time, end_time, category_id)` — was offered and not yet built.
 
-**4. Dynamic Type.** Font sizes are fixed numbers throughout. React Native scales `Text` by
-default, but the layouts were designed at one size and were never checked at larger ones.
+### 3. No service worker
+Data is local, but the app shell is fetched on every cold start. Force-quit with no
+signal can show Safari's offline page. This is the last violation of §2's
+"works with zero network".
+
+### 4. Restore from a backup
+Export is one-way. "Clear website data" is unrecoverable even holding the JSON.
+
+### 5. Categories can only be renamed or hidden, not added. Dynamic Type unverified.
 
 ---
+
+### Invariants — do not regress these while doing the above
+
+Each of these fixed a bug found on a real device. A new session that "simplifies" any
+of them will reintroduce a failure that took a long time to find.
+
+- **Writes must not be the only thing wrapped.** Reads run during render; an
+  unguarded one crashes the app. `safeRead` falls back to the last value and, after
+  one failure, skips further reads for three seconds so a stall is paid once instead
+  of once per hook.
+- **`bump()` runs in `finally`.** A failed write may well have landed; the UI has to
+  show what is actually stored.
+- **Every write path has try/catch and says something** — inline where the action
+  happened, plus a toast. `Alert.alert` is a **no-op** on react-native-web; never use
+  it. That is why Save silently did nothing for a whole session.
+- **Inserts are idempotent** (`src/db/*.ts`) and submits are debounced
+  (`useSubmitGuard`). Nothing on the write path was idempotent, and a blocked main
+  thread means a second tap fires the instant the first finishes.
+- **`scripts/patch-expo-sqlite.js`** — see §11. Each fix is applied independently
+  because CI restores a cached `node_modules` that may be half patched.
+- **Offsets come from an entry's own day**, not the day on screen. An entry crossing
+  midnight lists under both, and measuring against the later one rewrote when it
+  happened.
+- **`appliedSignature` starts `null`** in Log. Tabs mount lazily, so the first tap on
+  a gap after launch is that screen's first render; seeding it with the incoming
+  params drops them and logs to today.
+- **`useNow`, not `new Date()` at mount.** Tabs never unmount; a frozen clock meant
+  logging after midnight landed on yesterday.
+- **`web.output` stays `static`** — see §13.
+
+### How to verify anything is actually fixed
+
+1. `npx tsc --noEmit`, `npx eslint .`, `npx jest` — all must be clean.
+2. `npx expo export --platform web` and exercise it in a browser. Test with **real
+   data**; an empty database hid a whole bug class.
+3. **Confirm what is deployed.** Pushed is not deployed — a broken `postinstall` kept
+   Netlify serving an old build for hours while fixes sat in `main` looking shipped.
+   Fetch `/`, pull the `entry-*.js` URL out of the HTML, fetch it, and grep for a
+   string unique to the commit.
+4. The device is the only real test. Desktop Chromium did not reproduce the timeout,
+   the OPFS lock, or the install behaviour.
+
+### Still never verified
+The nightly notification firing. Dynamic Type at larger sizes. Whether the async
+migration fixes the freeze — that is the whole point of task 1.
 
 ## 13. Distribution — decided: ship the web build
 
