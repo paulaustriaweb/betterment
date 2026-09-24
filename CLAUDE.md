@@ -434,6 +434,23 @@ date + note on transactions, a top-anchored toast that no longer blocks taps. An
 from the previous build was tested on the same origin: existing entries and transactions
 survived.
 
+**Redesign on 2026-09-25, from real use** (the owner logs the whole day once, at night):
+- **Overview is a report**, not a nag: the hero is time *logged* with a category bar;
+  split cards are top activity + "logged until" (today) or daily average + unlogged on
+  finished days (week/month). Between midnight and 5 AM the first pill is **"Tonight"**
+  and covers yesterday-until-now, because that's the day being logged. Math in
+  `lib/report.ts`.
+- **Tracking starts at the first entry ever** (`useTrackingStart`). Nothing before it is
+  "not logged" — Overview and Day's gaps both respect it.
+- **Log takes typed times.** From/To are `TimeField`s (number pad; `lib/timeInput.ts`
+  resolves "7" to AM/PM and day from context; a tap flips AM/PM). Start and end are
+  absolute moments, not offsets from a day. Each entry starts where the last one ended,
+  across midnight. "Your usual" (`lib/routines.ts`) offers repeated entries as one tap.
+  The drag bar stays as a preview and optional control.
+- Launch screen in `+html.tsx` (removed by `hideLaunchScreen` once ready), persistent
+  storage requested on web, backup-due dot on Settings (`lib/backupDue.ts`), header
+  respects the top safe-area inset.
+
 ### 1. Test on the iPhone. Nothing above has been run in iOS Safari yet.
 Specifically: the freeze should be gone (the whole point of the async move), the share
 sheet should still open from "Back up my data" (the backup is built as Settings opens so
@@ -465,13 +482,13 @@ of them will reintroduce a failure that took a long time to find.
   Submits go through `useSubmitGuard`, which ignores a tap while a save is in flight.
 - **The toast is not a Modal.** A Modal on web is a full-screen layer and swallowed every
   tap while a toast was up. `ToastLayer` is a pass-through strip at the top.
-- **Log's start and duration are `null` until touched** and follow the defaults until then;
-  data arrives after the first render now, so a value captured at mount is wrong.
+- **Log's from/to are `null` until touched** and follow the defaults until then (chain
+  from the last entry, else end at now); data arrives after the first render, so a value
+  captured at mount is wrong.
 - **`scripts/patch-expo-sqlite.js`** — see §11. Each fix is applied independently
   because CI restores a cached `node_modules` that may be half patched.
-- **Offsets come from an entry's own day**, not the day on screen. An entry crossing
-  midnight lists under both, and measuring against the later one rewrote when it
-  happened.
+- **Entries are edited as absolute moments** (Log's from/to are Dates). Offsets from
+  the day on screen once rewrote a midnight-crossing entry; don't reintroduce them.
 - **`appliedSignature` starts `null`** in Log. Tabs mount lazily, so the first tap on
   a gap after launch is that screen's first render; seeding it with the incoming
   params drops them and logs to today.

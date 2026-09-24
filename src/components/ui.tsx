@@ -10,6 +10,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { colors, radius, spacing, type } from '@/lib/colors';
 import { fitFontSize } from '@/lib/fit';
 import { ChevronRightIcon, CloseIcon, MinusIcon, PlusIcon } from './icons';
@@ -28,8 +30,11 @@ export function ScreenHeader({
   subtitle?: string;
   right?: ReactNode;
 }) {
+  // Some iOS versions start a home-screen web app under the status bar; without
+  // this the title sat on top of the clock. Zero where the view starts below it.
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.headerRow}>
+    <View style={[styles.headerRow, { marginTop: insets.top }]}>
       <View>
         <Text style={styles.headerTitle}>{title}</Text>
         {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}

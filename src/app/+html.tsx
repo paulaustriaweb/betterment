@@ -30,9 +30,47 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="apple-mobile-web-app-title" content="Betterment" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <ScrollViewStyleReset />
-        <style dangerouslySetInnerHTML={{ __html: `body { background-color: ${colors.ground}; }` }} />
+        <style dangerouslySetInnerHTML={{ __html: `body { background-color: ${colors.ground}; }
+#launch {
+  position: fixed; inset: 0; z-index: 2000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  background: ${colors.ground};
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  transition: opacity 240ms cubic-bezier(.4,0,1,1);
+}
+#launch.gone { opacity: 0; pointer-events: none; }
+#launch .mark {
+  width: 64px; height: 64px; border-radius: 20px; background: ${colors.rose};
+  display: flex; align-items: center; justify-content: center;
+}
+#launch .mark span { width: 30px; height: 8px; border-radius: 4px; background: #fff; display: block; }
+#launch .name { font-size: 20px; font-weight: 700; letter-spacing: -0.4px; color: ${colors.ink}; }
+#launch .track { width: 120px; height: 4px; border-radius: 2px; background: ${colors.gap}; overflow: hidden; }
+#launch .track span {
+  display: block; width: 40%; height: 100%; border-radius: 2px; background: ${colors.rose};
+  animation: launch-slide 1.1s cubic-bezier(.2,.8,.2,1) infinite;
+}
+@keyframes launch-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@media (prefers-reduced-motion: reduce) {
+  #launch .track span { animation: none; width: 100%; opacity: .5; }
+  #launch { transition: opacity 120ms linear; }
+}
+` }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {/* Shown the instant the page opens, before any JavaScript — the bundle is
+            1.7 MB and a phone takes a moment. Removed by the app once it's ready. */}
+        <div id="launch" aria-hidden="true">
+          <div className="mark">
+            <span />
+          </div>
+          <div className="name">Betterment</div>
+          <div className="track">
+            <span />
+          </div>
+        </div>
+        {children}
+      </body>
     </html>
   );
 }

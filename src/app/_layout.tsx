@@ -23,12 +23,14 @@ import { SETTINGS_KEY } from '@/hooks/useSettings';
 import { colors } from '@/lib/colors';
 import { addReminderTapListener } from '@/lib/notifications';
 import { registerServiceWorker } from '@/lib/serviceWorker';
+import { hideLaunchScreen, requestPersistentStorage } from '@/lib/webShell';
 
 /**
  * Settings and categories are tiny and every screen reads them, so they load
  * before the first render — no flash of the default currency or a missing chip.
  */
 async function startDb(): Promise<void> {
+  requestPersistentStorage();
   await initDb();
   primeQuery(SETTINGS_KEY, await listSettings());
   primeQuery(CATEGORIES_KEY, await listCategories());
@@ -68,7 +70,10 @@ export default function RootLayout() {
   const ready = (fontsLoaded || fontError !== null) && dbReady;
 
   useEffect(() => {
-    if (ready || dbError) SplashScreen.hideAsync();
+    if (ready || dbError) {
+      SplashScreen.hideAsync();
+      hideLaunchScreen();
+    }
   }, [ready, dbError]);
 
   // Tapping the nightly reminder lands straight on Log.
