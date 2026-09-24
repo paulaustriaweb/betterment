@@ -30,3 +30,16 @@ export async function removeDuplicates(): Promise<number> {
   });
   return removed;
 }
+
+/**
+ * Every entry, transaction and goal — a fresh start. Categories and settings stay,
+ * so the app still works the way it was set up. One transaction: all or nothing.
+ */
+export async function eraseLoggedData(): Promise<void> {
+  const db = getDb();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM time_blocks');
+    await db.runAsync('DELETE FROM transactions');
+    await db.runAsync('DELETE FROM goals');
+  });
+}

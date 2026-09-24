@@ -22,6 +22,7 @@ import { primeQuery } from '@/hooks/useDbQuery';
 import { SETTINGS_KEY } from '@/hooks/useSettings';
 import { colors } from '@/lib/colors';
 import { addReminderTapListener } from '@/lib/notifications';
+import { setHapticsEnabled } from '@/lib/haptics';
 import { registerServiceWorker } from '@/lib/serviceWorker';
 import { hideLaunchScreen, requestPersistentStorage } from '@/lib/webShell';
 
@@ -32,7 +33,9 @@ import { hideLaunchScreen, requestPersistentStorage } from '@/lib/webShell';
 async function startDb(): Promise<void> {
   requestPersistentStorage();
   await initDb();
-  primeQuery(SETTINGS_KEY, await listSettings());
+  const settings = await listSettings();
+  primeQuery(SETTINGS_KEY, settings);
+  setHapticsEnabled(settings.haptics !== '0');
   primeQuery(CATEGORIES_KEY, await listCategories());
 }
 

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { buildBackup, restoreBackup } from '@/db/backup';
-import { countDuplicates, removeDuplicates } from '@/db/duplicates';
+import { countDuplicates, eraseLoggedData, removeDuplicates } from '@/db/duplicates';
 import { useDbVersion, useWrite } from '@/hooks/DbVersionContext';
 import { useDbQuery } from '@/hooks/useDbQuery';
 import { useSetting } from '@/hooks/useSettings';
@@ -25,6 +25,7 @@ export function DataRows() {
   const duplicates = useDbQuery('duplicates', countDuplicates, 0).data;
   const [prepared, setPrepared] = useState<Backup | null>(null);
   const [restoring, setRestoring] = useState<Backup | null>(null);
+  const [erasing, setErasing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastBackup, setLastBackup] = useSetting('last_backup_at', '');
 
@@ -82,6 +83,20 @@ export function DataRows() {
         console.error('restore failed', e);
         setError("Couldn't restore that — nothing was changed.");
         toast("Couldn't restore that — nothing was changed.", { tone: 'danger' });
+      }
+    });
+  }
+
+  function confirmErase() {
+    submit(async () => {
+      try {
+        await write(eraseLoggedData);
+        setErasing(false);
+        setError(null);
+        toast('Erased. A fresh start.', { durationMs: 4000 });
+      } catch (e) {
+        console.error('erase failed', e);
+        setError("Couldn't erase — nothing was changed.");
       }
     });
   }
@@ -150,6 +165,31 @@ export function DataRows() {
               accessibilityRole="button"
             >
               <Text style={styles.replaceLabel}>Replace</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
+
+      <DisclosureRow
+        icon={<TrashIcon color={colors.danger} />}
+        title="Erase everything logged"
+        hint="Entries, money and goals — categories and settings stay"
+        onPress={() => setErasing(true)}
+      />
+
+      {erasing ? (
+        <View style={styles.confirm}>
+          <Text style={styles.confirmTitle}>Erase everything logged?</Text>
+          <Text style={styles.confirmBody}>
+            Every entry, transaction and goal goes, and there&apos;s no undo. Back it up above first if you might want
+            it again.
+          </Text>
+          <View style={styles.confirmActions}>
+            <Pressable style={[styles.confirmButton, styles.keep]} onPress={() => setErasing(false)} accessibilityRole="button">
+              <Text style={styles.keepLabel}>Keep it</Text>
+            </Pressable>
+            <Pressable style={[styles.confirmButton, styles.replace]} onPress={confirmErase} accessibilityRole="button">
+              <Text style={styles.replaceLabel}>Erase</Text>
             </Pressable>
           </View>
         </View>

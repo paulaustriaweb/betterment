@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useCategories, useCategoryEdits } from '@/hooks/useCategories';
-import { colors, font } from '@/lib/colors';
+import { categoryColors, colors, font } from '@/lib/colors';
 import { Banner } from './Banner';
 import { useToast } from './Toast';
 import { EyeIcon, EyeOffIcon } from './icons';
@@ -15,7 +15,9 @@ import { Sheet } from './ui';
  */
 export function CategoriesSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const categories = useCategories();
-  const { rename, setActive } = useCategoryEdits();
+  const { rename, setActive, create } = useCategoryEdits();
+  const [newName, setNewName] = useState<string | null>(null);
+  const [newColor, setNewColor] = useState<string>(categoryColors.other.dot);
   const [draft, setDraft] = useState<{ id: number; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const toast = useToast();
@@ -40,6 +42,25 @@ export function CategoriesSheet({ visible, onClose }: { visible: boolean; onClos
     }
   }
 
+  async function addCategory() {
+    const name = (newName ?? '').trim();
+    setNewName(null);
+    if (!name) return;
+    if (categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+      setError(`There's already a category called ${name}.`);
+      return;
+    }
+    try {
+      await create(name, newColor);
+      setError(null);
+      toast(`Added ${name}.`);
+    } catch (e) {
+      console.error('category add failed', e);
+      setError("Couldn't add that — try again.");
+      toast("Couldn't add that — try again.", { tone: 'danger' });
+    }
+  }
+
   async function toggleActive(id: number, name: string, active: boolean) {
     try {
       await setActive(id, active);
@@ -55,7 +76,7 @@ export function CategoriesSheet({ visible, onClose }: { visible: boolean; onClos
   }
 
   return (
-    <Sheet visible={visible} title="Categories" subtitle="Tap a name to rename it" onClose={onClose}>
+    <Sheet visible={visible} title="Categories" subtitle="Tap a name to rename it · add your own" onClose={onClose}>
       <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
         {categories.map((c) => {
           const editing = draft?.id === c.id;
@@ -102,6 +123,51 @@ export function CategoriesSheet({ visible, onClose }: { visible: boolean; onClos
             </View>
           );
         })}
+        {newName === null ? (
+          <Pressable
+            style={styles.addRow}
+            onPress={() => setNewName('')}
+            accessibilityRole="button"
+            accessibilityLabel="Add a category"
+          >
+            <Text style={styles.addLabel}>+ Add a category</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.newBox}>
+            <TextInput
+              style={styles.input}
+              value={newName}
+              onChangeText={setNewName}
+              onSubmitEditing={addCategory}
+              placeholder="Like Gym, or Commute"
+              placeholderTextColor={colors.inkFaint}
+              autoFocus
+              returnKeyType="done"
+              maxLength={28}
+            />
+            <View style={styles.swatches}>
+              {Object.values(categoryColors).map((c) => (
+                <Pressable
+                  key={c.dot}
+                  style={[styles.swatch, { backgroundColor: c.dot }, newColor === c.dot && styles.swatchOn]}
+                  onPress={() => setNewColor(c.dot)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: newColor === c.dot }}
+                  accessibilityLabel="Colour"
+                />
+              ))}
+            </View>
+            <View style={styles.newActions}>
+              <Pressable onPress={() => setNewName(null)} accessibilityRole="button" style={styles.newCancel}>
+                <Text style={styles.newCancelLabel}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={addCategory} accessibilityRole="button" style={styles.newSave}>
+                <Text style={styles.newSaveLabel}>Add</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
         {error ? (
           <View style={styles.banner}>
             <Banner message={error} />
@@ -109,7 +175,7 @@ export function CategoriesSheet({ visible, onClose }: { visible: boolean; onClos
         ) : null}
 
         <Text style={styles.hint}>
-          Hidden categories drop out of the picker on Log. Anything already logged against one keeps its name
+          Colours are shared with the built-in categories. Hidden categories drop out of the picker on Log. Anything already logged against one keeps its name
           and colour.
         </Text>
       </ScrollView>
@@ -136,6 +202,17 @@ const styles = StyleSheet.create({
     paddingBottom: 3,
   },
   toggle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  addRow: { paddingVertical: 13 },
+  addLabel: { fontFamily: font.semibold, fontSize: 13.5, color: colors.rose },
+  newBox: { paddingVertical: 12, gap: 12 },
+  swatches: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  swatch: { width: 26, height: 26, borderRadius: 13 },
+  swatchOn: { borderWidth: 3, borderColor: colors.ink },
+  newActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  newCancel: { paddingVertical: 9, paddingHorizontal: 14 },
+  newCancelLabel: { fontFamily: font.semibold, fontSize: 13, color: colors.inkSoft },
+  newSave: { paddingVertical: 9, paddingHorizontal: 18, borderRadius: 16, backgroundColor: colors.ink },
+  newSaveLabel: { fontFamily: font.semibold, fontSize: 13, color: colors.surface },
   banner: { marginTop: 12 },
   hint: { fontFamily: font.regular, fontSize: 11.5, color: colors.inkSoft, lineHeight: 17, paddingVertical: 16 },
 });

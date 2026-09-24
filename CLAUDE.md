@@ -447,6 +447,15 @@ survived.
   absolute moments, not offsets from a day. Each entry starts where the last one ended,
   across midnight. "Your usual" (`lib/routines.ts`) offers repeated entries as one tap.
   The drag bar stays as a preview and optional control.
+- **Walk me through my day** (`WalkthroughSheet`): from where the last entry ended,
+  "until when, doing what?" — tapping the activity saves and advances. Opened from
+  Log's card or Overview's "Log your day" (`/log?walk=1`). **Copy yesterday**
+  (`lib/copyDay.ts`) offers yesterday's entries onto an empty day, minus anything in
+  the future or clashing. **Daily targets** (`lib/targets.ts`, stored as JSON in the
+  `targets` setting) are judged per day and shown on Overview.
+- Settings grouped (Your day · App · Your data): targets, night-ends hour (drives
+  "Tonight"), vibration toggle (`lib/haptics.ts` — all feedback goes through it), add
+  a category, erase everything logged.
 - Launch screen in `+html.tsx` (removed by `hideLaunchScreen` once ready), persistent
   storage requested on web, backup-due dot on Settings (`lib/backupDue.ts`), header
   respects the top safe-area inset.

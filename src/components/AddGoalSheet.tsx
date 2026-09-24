@@ -1,5 +1,5 @@
 import { addDays, addMonths, format, isSameDay, startOfDay } from 'date-fns';
-import * as Haptics from 'expo-haptics';
+import * as haptics from '@/lib/haptics';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -104,7 +104,7 @@ export function AddGoalSheet({ visible, editing, weekStartsOn, onClose, onSave }
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={`${p.label}, ${format(p.date, 'MMMM d')}`}
                 onPress={() => {
-                  Haptics.selectionAsync();
+                  haptics.tick();
                   setDeadline(p.date);
                 }}
               >

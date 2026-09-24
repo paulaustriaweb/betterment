@@ -12,7 +12,7 @@ import {
   startOfWeek,
   endOfWeek,
 } from 'date-fns';
-import * as Haptics from 'expo-haptics';
+import * as haptics from '@/lib/haptics';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -95,7 +95,7 @@ export function MonthCalendar({ value, onChange, minDate, maxDate, weekStartsOn 
               style={styles.cell}
               disabled={disabled}
               onPress={() => {
-                Haptics.selectionAsync();
+                haptics.tick();
                 onChange(startOfDay(day));
               }}
               accessibilityRole="button"

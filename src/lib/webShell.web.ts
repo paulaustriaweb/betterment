@@ -1,3 +1,6 @@
+/** Long enough to register as the app opening, rather than a flicker. */
+const MIN_VISIBLE_MS = 800;
+
 /**
  * The launch screen lives in the HTML itself (+html.tsx) so it shows the instant the
  * page opens, while the 1.7 MB bundle downloads and parses. Faded out once the app
@@ -6,8 +9,12 @@
 export function hideLaunchScreen(): void {
   const el = document.getElementById('launch');
   if (!el) return;
-  el.classList.add('gone');
-  setTimeout(() => el.remove(), 400);
+  // performance.now() counts from navigation start, so a slow load waits no longer.
+  const wait = Math.max(0, MIN_VISIBLE_MS - performance.now());
+  setTimeout(() => {
+    el.classList.add('gone');
+    setTimeout(() => el.remove(), 400);
+  }, wait);
 }
 
 /**

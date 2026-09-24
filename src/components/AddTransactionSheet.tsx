@@ -1,5 +1,5 @@
 import { format, isToday, isYesterday, startOfDay } from 'date-fns';
-import * as Haptics from 'expo-haptics';
+import * as haptics from '@/lib/haptics';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -70,7 +70,7 @@ export function AddTransactionSheet({ visible, currency, editing, weekStartsOn, 
   const canSave = parsed > 0 && label !== null;
 
   function switchType(next: 'expense' | 'income') {
-    Haptics.selectionAsync();
+    haptics.tick();
     setType(next);
     setLabel(null);
   }
@@ -151,7 +151,7 @@ export function AddTransactionSheet({ visible, currency, editing, weekStartsOn, 
               accessibilityState={{ selected: active }}
               accessibilityLabel={o.label}
               onPress={() => {
-                Haptics.selectionAsync();
+                haptics.tick();
                 setLabel(o.label);
               }}
             >

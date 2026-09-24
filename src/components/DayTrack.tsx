@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import * as haptics from '@/lib/haptics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 
@@ -73,7 +73,7 @@ export function DayTrack({ startMin, durMin, existing, onChange }: Props) {
       const hour = Math.floor(minutes / 60);
       if (hour !== lastHourRef.current) {
         lastHourRef.current = hour;
-        Haptics.selectionAsync();
+        haptics.tick();
       }
     };
 

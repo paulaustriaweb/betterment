@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import * as haptics from '@/lib/haptics';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, font, radius } from '@/lib/colors';
@@ -18,7 +18,7 @@ export function CategoryChip({ category, selected, onSelect }: Props) {
       accessibilityState={{ selected }}
       accessibilityLabel={category.name}
       onPress={() => {
-        Haptics.selectionAsync();
+        haptics.tick();
         onSelect(category.id);
       }}
     >

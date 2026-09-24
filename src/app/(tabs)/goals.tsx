@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import * as Haptics from 'expo-haptics';
+import * as haptics from '@/lib/haptics';
 import { useMemo, useState } from 'react';
 import { LayoutAnimation, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -36,9 +36,8 @@ export default function GoalsScreen() {
 
   async function toggle(id: number, complete: boolean) {
     try {
-      Haptics.notificationAsync(
-        complete ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning
-      );
+      if (complete) haptics.success();
+      else haptics.warning();
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       await setComplete(id, complete);
       setNotice(null);

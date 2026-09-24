@@ -25,3 +25,8 @@ export async function renameCategory(id: number, name: string): Promise<void> {
 export async function setCategoryActive(id: number, active: boolean): Promise<void> {
   await getDb().runAsync('UPDATE categories SET is_active = ? WHERE id = ?', [active ? 1 : 0, id]);
 }
+
+export async function insertCategory(name: string, color: string): Promise<number> {
+  const result = await getDb().runAsync('INSERT INTO categories (name, color, is_active) VALUES (?, ?, 1)', [name, color]);
+  return result.lastInsertRowId;
+}

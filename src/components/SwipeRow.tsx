@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import * as haptics from '@/lib/haptics';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -38,7 +38,7 @@ export function SwipeRow({ children, onDelete }: Props) {
         onPanResponderRelease: (_, g) => {
           const base = open ? -ACTION_WIDTH : 0;
           const shouldOpen = base + g.dx < -ACTION_WIDTH / 2;
-          if (shouldOpen !== open) Haptics.selectionAsync();
+          if (shouldOpen !== open) haptics.tick();
           setOpen(shouldOpen);
           Animated.spring(translateX, {
             toValue: shouldOpen ? -ACTION_WIDTH : 0,
@@ -52,7 +52,7 @@ export function SwipeRow({ children, onDelete }: Props) {
   );
 
   function confirmDelete() {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    haptics.warning();
     onDelete();
   }
 

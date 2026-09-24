@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-import { listCategories, renameCategory, setCategoryActive } from '@/db/categories';
+import { insertCategory, listCategories, renameCategory, setCategoryActive } from '@/db/categories';
 import type { Category } from '@/lib/types';
 import { useWrite } from './DbVersionContext';
 import { useDbQuery } from './useDbQuery';
@@ -20,5 +20,6 @@ export function useCategoryEdits() {
     (id: number, active: boolean) => write(() => setCategoryActive(id, active)),
     [write]
   );
-  return { rename, setActive };
+  const create = useCallback((name: string, color: string) => write(() => insertCategory(name, color)), [write]);
+  return { rename, setActive, create };
 }
