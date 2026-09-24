@@ -1,4 +1,15 @@
-import { addDays, addMonths, addWeeks, format, isSameDay, startOfDay, startOfMonth, startOfWeek, subDays } from 'date-fns';
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  eachDayOfInterval,
+  format,
+  isSameDay,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  subDays,
+} from 'date-fns';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -7,7 +18,8 @@ import { CategoriesSheet } from '@/components/CategoriesSheet';
 import { CategoryBar } from '@/components/CategoryBar';
 import { ReminderSheet } from '@/components/ReminderSheet';
 import { SettingsSheet } from '@/components/SettingsSheet';
-import { GearIcon, PlusIcon, TimelineIcon } from '@/components/icons';
+import { TargetsSheet } from '@/components/TargetsSheet';
+import { CheckIcon, GearIcon, PlusIcon, TimelineIcon } from '@/components/icons';
 import { DisclosureRow, PrimaryButton, RangePills, ScreenHeader, Sheet, StatCard } from '@/components/ui';
 import { useCategories } from '@/hooks/useCategories';
 import { useNow } from '@/hooks/useNow';
@@ -17,13 +29,9 @@ import { colors, font, spacing, type } from '@/lib/colors';
 import { fitFontSize } from '@/lib/fit';
 import { backupDue } from '@/lib/backupDue';
 import { buildReport } from '@/lib/report';
+import { evaluateTargets, parseTargets } from '@/lib/targets';
 import { formatDuration, formatHoursPadded, greeting } from '@/lib/time';
 
-/**
- * Until 5 AM the day being logged is the one just ending, not the few minutes of the
- * new one — so "Today" becomes "Tonight" and reaches back to yesterday morning.
- */
-const NIGHT_ENDS_HOUR = 5;
 
 /**
  * A report of where the time went — logged once a night, read the next morning.
@@ -38,6 +46,7 @@ export default function OverviewScreen() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [targetsOpen, setTargetsOpen] = useState(false);
 
   const [weekStartSetting] = useSetting('week_starts_on', '0');
   const weekStartsOn = weekStartSetting === '1' ? 1 : 0;
@@ -46,7 +55,13 @@ export default function OverviewScreen() {
   const [lastBackup] = useSetting('last_backup_at', '');
   const needsBackup = backupDue(lastBackup ? new Date(lastBackup) : null, trackingStart, now);
 
-  const lateNight = now.getHours() < NIGHT_ENDS_HOUR;
+  // Until the night ends (5 AM by default, set in Settings) the day being logged is the
+  // one just ending, not the few minutes of the new one — so "Today" becomes "Tonight"
+  // and reaches back to yesterday morning.
+  const [nightEndsSetting] = useSetting('night_ends', '5');
+  const lateNight = now.getHours() < (Number(nightEndsSetting) || 0);
+  const [targetsSetting] = useSetting('targets', '[]');
+  const targets = useMemo(() => parseTargets(targetsSetting), [targetsSetting]);
   const ranges = [
     { key: 'today', label: lateNight ? 'Tonight' : 'Today' },
     { key: 'week', label: 'This week' },
@@ -72,6 +87,19 @@ export default function OverviewScreen() {
     () => buildReport(blocks, rangeStart, rangeEnd, now, trackingStart),
     [blocks, rangeStart, rangeEnd, now, trackingStart]
   );
+
+  // Targets are judged per day: the day being logged, or every tracked day so far.
+  const targetDays = useMemo(() => {
+    if (range === 'today') return [startOfDay(rangeStart)];
+    if (!trackingStart) return [];
+    const first = startOfDay(trackingStart > rangeStart ? trackingStart : rangeStart);
+    const lastInRange = startOfDay(subDays(rangeEnd, 1));
+    const last = startOfDay(now) < lastInRange ? startOfDay(now) : lastInRange;
+    return last >= first ? eachDayOfInterval({ start: first, end: last }) : [];
+  }, [range, rangeStart, rangeEnd, trackingStart, now]);
+  const targetResults = useMemo(() => evaluateTargets(targets, blocks, targetDays), [targets, blocks, targetDays]);
+  const targetChecks = targetResults.reduce((sum, r) => sum + r.days.length, 0);
+  const targetsMet = targetResults.reduce((sum, r) => sum + r.metDays, 0);
 
   const nameOf = (id: number) => categories.find((c) => c.id === id)?.name ?? 'Other';
   const colorOf = (id: number) => categories.find((c) => c.id === id)?.color ?? colors.inkFaint;
@@ -178,12 +206,28 @@ export default function OverviewScreen() {
             }
             onPress={() => setSheetOpen(true)}
           />
+          <DisclosureRow
+            icon={<CheckIcon color={colors.rose} />}
+            title={targets.length === 0 ? 'Set daily targets' : 'Targets'}
+            hint={
+              targets.length === 0
+                ? 'Like Sleep 7h, or Scrolling under 2h'
+                : targetChecks === 0
+                  ? 'Nothing to check yet'
+                  : `${targetsMet} of ${targetChecks} met${isToday ? '' : range === 'week' ? ' this week' : ' this month'}`
+            }
+            onPress={() => setTargetsOpen(true)}
+          />
         </View>
 
         <View style={styles.action}>
           <PrimaryButton
             label={isToday && !leader ? 'Log your day' : 'Add time'}
-            onPress={() => router.push('/log')}
+            onPress={() =>
+              isToday && !leader
+                ? router.push({ pathname: '/log', params: { walk: '1', n: String(Date.now()) } })
+                : router.push('/log')
+            }
             icon={<PlusIcon color={colors.surface} />}
           />
         </View>
@@ -231,6 +275,16 @@ export default function OverviewScreen() {
           setSettingsOpen(false);
           setCategoriesOpen(true);
         }}
+        onOpenTargets={() => {
+          setSettingsOpen(false);
+          setTargetsOpen(true);
+        }}
+      />
+      <TargetsSheet
+        visible={targetsOpen}
+        categories={categories}
+        results={targetResults}
+        onClose={() => setTargetsOpen(false)}
       />
       <ReminderSheet visible={reminderOpen} onClose={() => setReminderOpen(false)} />
       <CategoriesSheet visible={categoriesOpen} onClose={() => setCategoriesOpen(false)} />
@@ -288,7 +342,7 @@ const styles = StyleSheet.create({
   heroSub: { fontFamily: font.regular, fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 10, lineHeight: 17 },
 
   statRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  disclosure: { marginTop: 18 },
+  disclosure: { marginTop: 18, gap: 8 },
   action: { marginTop: 'auto', marginBottom: 20 },
 
   sheetScroll: { marginTop: 16, maxHeight: 360 },

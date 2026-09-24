@@ -18,13 +18,15 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Banner } from '@/components/Banner';
+import { CopyDaySheet } from '@/components/CopyDaySheet';
 import { CategoryChip } from '@/components/CategoryChip';
 import { DaySwitch } from '@/components/DaySwitch';
 import { DayTrack, type TrackBlock } from '@/components/DayTrack';
 import { EntriesSheet } from '@/components/EntriesSheet';
-import { NoteIcon, PlusIcon, TimelineIcon } from '@/components/icons';
+import { ArrowRightIcon, NoteIcon, PlusIcon, TimelineIcon } from '@/components/icons';
 import { RoutineChips } from '@/components/RoutineChips';
 import { TimeField } from '@/components/TimeField';
+import { WalkthroughSheet } from '@/components/WalkthroughSheet';
 import { useToast } from '@/components/Toast';
 import { Card, DisclosureRow, PrimaryButton, ScreenHeader, Stepper } from '@/components/ui';
 import type { TimeBlockInput } from '@/db/timeBlocks';
@@ -35,6 +37,7 @@ import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import { useLastTimeBlock, useTimeBlocksForDay, useTimeBlocksForRange } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, type } from '@/lib/colors';
 import { fitFontSize } from '@/lib/fit';
+import { copyDay } from '@/lib/copyDay';
 import { findRoutines, type Routine } from '@/lib/routines';
 import { detectOverlap, formatDuration } from '@/lib/time';
 import { clockAfter, clockNear, type Clock } from '@/lib/timeInput';
@@ -90,15 +93,24 @@ export default function LogScreen() {
   const [defaultDurationSetting] = useSetting('default_duration', '60');
   const defaultDuration = clampDuration(Number(defaultDurationSetting) || 60);
 
-  // Carry on from the last entry unless it's stale or runs into the future; otherwise
-  // end the new one at now.
-  const defaultFrom = useMemo(() => {
-    if (lastBlock) {
-      const end = new Date(lastBlock.endTime);
-      if (end <= now && differenceInHours(now, end) < 36) return end;
-    }
-    return floorToStep(addMinutes(now, -defaultDuration));
-  }, [lastBlock, now, defaultDuration]);
+  // Where the last entry ended, if that's recent and not in the future.
+  const chainPoint = useMemo(() => {
+    if (!lastBlock) return null;
+    const end = new Date(lastBlock.endTime);
+    return end <= now && differenceInHours(now, end) < 36 ? end : null;
+  }, [lastBlock, now]);
+  // Carry on from the last entry; otherwise end the new one at now.
+  const defaultFrom = useMemo(
+    () => chainPoint ?? floorToStep(addMinutes(now, -defaultDuration)),
+    [chainPoint, now, defaultDuration]
+  );
+  // A walkthrough with nothing to carry on from starts at the top of the day being
+  // logged — before 5 AM, that's still yesterday.
+  const walkStart = useMemo(
+    () => chainPoint ?? startOfDay(now.getHours() < 5 ? subDays(now, 1) : now),
+    [chainPoint, now]
+  );
+  const toLog = differenceInMinutes(now, walkStart);
 
   // null = untouched, follow the default. Data loads after the first render, so a
   // value captured at mount would miss where the last entry ended.
@@ -119,11 +131,22 @@ export default function LogScreen() {
   const recentEnd = useMemo(() => addDays(startOfDay(now), 1), [now]);
   const { blocks: recent } = useTimeBlocksForRange(recentStart, recentEnd);
   const routines = useMemo(() => findRoutines(recent), [recent]);
+  // `day` is rebuilt every render; pin it to its timestamp so the memo below holds.
+  const dayMs = day.getTime();
+  const targetDay = useMemo(() => new Date(dayMs), [dayMs]);
+  const sourceDay = useMemo(() => subDays(new Date(dayMs), 1), [dayMs]);
+  const { blocks: sourceBlocks } = useTimeBlocksForDay(sourceDay);
+  const drafts = useMemo(
+    () => (blocks.length === 0 ? copyDay(sourceBlocks, sourceDay, targetDay, nearby, now) : []),
+    [blocks.length, sourceBlocks, sourceDay, targetDay, nearby, now]
+  );
 
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
+  const [walkOpen, setWalkOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [pendingEdit, setPendingEdit] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -133,9 +156,16 @@ export default function LogScreen() {
   // Arriving from Your day: a tapped gap prefills that stretch, a tapped entry opens
   // it for editing. Log is a tab and never remounts, so adjust during render when the
   // params change rather than syncing in an effect.
-  const params = useLocalSearchParams<{ date?: string; n?: string; start?: string; dur?: string; edit?: string }>();
+  const params = useLocalSearchParams<{
+    date?: string;
+    n?: string;
+    start?: string;
+    dur?: string;
+    edit?: string;
+    walk?: string;
+  }>();
   // `n` exists so tapping the same gap twice still counts as a change.
-  const paramSignature = [params.date, params.n, params.start, params.dur, params.edit].join('|');
+  const paramSignature = [params.date, params.n, params.start, params.dur, params.edit, params.walk].join('|');
   // Starts as null, not the current signature: tabs mount lazily, so the first tap on
   // a gap after launch is this screen's first render, and seeding with the incoming
   // params would drop them.
@@ -157,6 +187,8 @@ export default function LogScreen() {
       setTo(null);
     }
     setPendingEdit(edit);
+    // Overview's "Log your day" goes straight into the walkthrough.
+    if (params.walk === '1') setWalkOpen(true);
   } else if (pendingEdit !== null && blocksReady) {
     // Waits for that day's entries to load — acting on the previous day's list would
     // miss the entry and silently drop the edit.
@@ -319,6 +351,23 @@ export default function LogScreen() {
           right={<DaySwitch days={days} value={day} onChange={moveToDay} />}
         />
 
+        {toLog >= 30 && !editingId ? (
+          <Pressable
+            style={({ pressed }) => [styles.walk, pressed && styles.walkPressed]}
+            onPress={() => setWalkOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`${formatDuration(toLog)} to log since ${format(walkStart, 'EEEE h:mm a')}. Walk me through it.`}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.walkTitle}>Walk me through it</Text>
+              <Text style={styles.walkHint}>
+                {formatDuration(toLog)} to log since {format(walkStart, isSameDay(walkStart, now) ? 'h:mm a' : 'EEE h:mm a')}
+              </Text>
+            </View>
+            <ArrowRightIcon color={colors.roseDeep} />
+          </Pressable>
+        ) : null}
+
         <View style={styles.heroCard}>
           <View style={styles.heroTop}>
             <View>
@@ -442,6 +491,14 @@ export default function LogScreen() {
             </Card>
           ) : null}
 
+          {drafts.length > 0 && !editingId ? (
+            <DisclosureRow
+              icon={<PlusIcon color={colors.rose} size={16} />}
+              title="Copy yesterday"
+              hint={`${drafts.length} ${drafts.length === 1 ? 'entry fits' : 'entries fit'} · tap to review`}
+              onPress={() => setCopyOpen(true)}
+            />
+          ) : null}
           <DisclosureRow
             icon={<TimelineIcon color={colors.rose} />}
             title={isToday ? "Today's entries" : `Entries on ${format(day, 'MMM d')}`}
@@ -474,6 +531,28 @@ export default function LogScreen() {
         </View>
       </ScrollView>
 
+      <WalkthroughSheet
+        visible={walkOpen}
+        start={walkStart}
+        now={now}
+        categories={categories}
+        add={add}
+        remove={remove}
+        onClose={() => {
+          setWalkOpen(false);
+          resetForm();
+        }}
+      />
+      <CopyDaySheet
+        visible={copyOpen}
+        sourceDay={sourceDay}
+        targetDay={day}
+        drafts={drafts}
+        categories={categories}
+        add={add}
+        remove={remove}
+        onClose={() => setCopyOpen(false)}
+      />
       <EntriesSheet
         visible={listOpen}
         day={day}
@@ -494,7 +573,20 @@ const styles = StyleSheet.create({
   content: { paddingTop: 26, paddingHorizontal: spacing.gutter, paddingBottom: 24 },
 
 
-  heroCard: { backgroundColor: colors.rose, borderRadius: 26, padding: 18, marginTop: 16 },
+  walk: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.roseTint,
+    borderRadius: 20,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  walkPressed: { opacity: 0.7 },
+  walkTitle: { fontFamily: font.semibold, fontSize: 13.5, color: colors.roseDeep },
+  walkHint: { fontFamily: font.regular, fontSize: 11.5, color: colors.roseDeep, marginTop: 2 },
+  heroCard: { backgroundColor: colors.rose, borderRadius: 26, padding: 18, marginTop: 11 },
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroLabel: { ...type.label, color: 'rgba(255,255,255,0.80)' },
   heroValue: {
