@@ -1,8 +1,9 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { endOfDay, startOfDay } from 'date-fns';
 
 import {
   deleteTimeBlock,
+  getFirstStart,
   getLastTimeBlock,
   insertTimeBlock,
   listTimeBlocksForRange,
@@ -39,6 +40,15 @@ export function useTimeBlocksForRange(rangeStart: Date, rangeEnd: Date) {
   const read = useCallback(() => listTimeBlocksForRange(startIso, endIso), [startIso, endIso]);
   const { data, current, loaded } = useDbQuery(`range:${startIso}:${endIso}`, read, NONE);
   return { blocks: data, ready: current, loaded };
+}
+
+/**
+ * When tracking began: the first entry's start. Days before it aren't "not logged" —
+ * the app didn't exist for you yet. Null until the first entry is saved.
+ */
+export function useTrackingStart(): Date | null {
+  const iso = useDbQuery<string | null>('firstStart', getFirstStart, null).data;
+  return useMemo(() => (iso ? new Date(iso) : null), [iso]);
 }
 
 export function useLastTimeBlock(): TimeBlock | null {

@@ -66,18 +66,29 @@ export function capAtNow(end: Date, now: Date): Date {
   return end < now ? end : now;
 }
 
+export interface GapBounds {
+  /** Nothing before this counts — the moment tracking started (the first entry ever). */
+  from?: Date | null;
+  /** Nothing after this counts — now, since the future can't be logged yet. */
+  until?: Date;
+}
+
+function minuteOf(moment: Date, dayStart: Date): number {
+  return Math.min(MINUTES_PER_DAY, Math.max(0, differenceInMinutes(moment, dayStart)));
+}
+
 /**
  * The unlogged stretches of a day, in minutes from midnight. The product's whole point.
- * Pass `until` to stop at that moment — today's gaps end at now, not midnight.
+ * Bounded: today's gaps end at now, and nothing before the first entry ever is a gap —
+ * the app didn't exist for you yet.
  */
-export function findGaps(blocks: TimeBlock[], day: Date, until?: Date): Span[] {
+export function findGaps(blocks: TimeBlock[], day: Date, bounds: GapBounds = {}): Span[] {
   const dayStart = startOfDay(day);
-  const limit = until
-    ? Math.min(MINUTES_PER_DAY, Math.max(0, differenceInMinutes(until, dayStart)))
-    : MINUTES_PER_DAY;
+  const floor = bounds.from ? minuteOf(bounds.from, dayStart) : 0;
+  const limit = bounds.until ? minuteOf(bounds.until, dayStart) : MINUTES_PER_DAY;
   const spans = merge(clampToRange(blocks, dayStart, addDays(dayStart, 1)));
   const gaps: Span[] = [];
-  let cursor = 0;
+  let cursor = floor;
   for (const span of spans) {
     if (span.start >= limit) break;
     if (span.start > cursor) gaps.push({ start: cursor, end: span.start });
@@ -87,8 +98,13 @@ export function findGaps(blocks: TimeBlock[], day: Date, until?: Date): Span[] {
   return gaps;
 }
 
-export function longestGapMinutes(blocks: TimeBlock[], day: Date, until?: Date): number {
-  return findGaps(blocks, day, until).reduce((max, g) => Math.max(max, g.end - g.start), 0);
+export function longestGapMinutes(blocks: TimeBlock[], day: Date, bounds: GapBounds = {}): number {
+  return findGaps(blocks, day, bounds).reduce((max, g) => Math.max(max, g.end - g.start), 0);
+}
+
+/** Unlogged minutes between two moments — 0 if the window is empty or reversed. */
+export function unloggedBetween(blocks: TimeBlock[], start: Date, end: Date): number {
+  return end > start ? unaccountedMinutesInRange(blocks, start, end) : 0;
 }
 
 /** Logged minutes per category id across a range. Overlaps are counted per category as-is. */

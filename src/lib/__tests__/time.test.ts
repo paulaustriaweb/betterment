@@ -93,25 +93,42 @@ describe('findGaps until now', () => {
   const now = new Date('2026-09-21T08:00:00');
 
   it('stops at now — the rest of the day has not happened yet', () => {
-    expect(findGaps([], day, now)).toEqual([{ start: 0, end: 480 }]);
+    expect(findGaps([], day, { until: now })).toEqual([{ start: 0, end: 480 }]);
   });
 
   it('drops gaps that start after now', () => {
     const blocks = [block(1, '2026-09-21T00:00:00', '2026-09-21T07:00:00')];
-    expect(findGaps(blocks, day, now)).toEqual([{ start: 420, end: 480 }]);
+    expect(findGaps(blocks, day, { until: now })).toEqual([{ start: 420, end: 480 }]);
   });
 
   it('reports nothing when an entry runs past now', () => {
     const blocks = [block(1, '2026-09-21T00:00:00', '2026-09-21T09:00:00')];
-    expect(findGaps(blocks, day, now)).toEqual([]);
+    expect(findGaps(blocks, day, { until: now })).toEqual([]);
   });
 
   it('reports nothing for a day that has not started', () => {
-    expect(findGaps([], new Date('2026-09-22T12:00:00'), now)).toEqual([]);
+    expect(findGaps([], new Date('2026-09-22T12:00:00'), { until: now })).toEqual([]);
   });
 
   it('ignores an until past midnight', () => {
-    expect(findGaps([], day, new Date('2026-09-23T00:00:00'))).toEqual([{ start: 0, end: 1440 }]);
+    expect(findGaps([], day, { until: new Date('2026-09-23T00:00:00') })).toEqual([{ start: 0, end: 1440 }]);
+  });
+});
+
+describe('findGaps from the first entry', () => {
+  it('reports nothing on a day before tracking started', () => {
+    expect(findGaps([], day, { from: new Date('2026-09-22T09:00:00') })).toEqual([]);
+  });
+
+  it('starts counting at the first entry, not at midnight', () => {
+    const blocks = [block(1, '2026-09-21T09:00:00', '2026-09-21T10:00:00')];
+    expect(findGaps(blocks, day, { from: new Date('2026-09-21T09:00:00') })).toEqual([{ start: 600, end: 1440 }]);
+  });
+
+  it('combines with until', () => {
+    const blocks = [block(1, '2026-09-21T09:00:00', '2026-09-21T10:00:00')];
+    const bounds = { from: new Date('2026-09-21T09:00:00'), until: new Date('2026-09-21T12:00:00') };
+    expect(findGaps(blocks, day, bounds)).toEqual([{ start: 600, end: 720 }]);
   });
 });
 

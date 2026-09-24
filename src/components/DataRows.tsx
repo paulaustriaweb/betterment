@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, formatDistanceToNowStrict } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -6,6 +6,7 @@ import { buildBackup, restoreBackup } from '@/db/backup';
 import { countDuplicates, removeDuplicates } from '@/db/duplicates';
 import { useDbVersion, useWrite } from '@/hooks/DbVersionContext';
 import { useDbQuery } from '@/hooks/useDbQuery';
+import { useSetting } from '@/hooks/useSettings';
 import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import { exportBackup, pickBackup } from '@/lib/backup';
 import { countRows, type Backup } from '@/lib/backupFormat';
@@ -25,6 +26,7 @@ export function DataRows() {
   const [prepared, setPrepared] = useState<Backup | null>(null);
   const [restoring, setRestoring] = useState<Backup | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastBackup, setLastBackup] = useSetting('last_backup_at', '');
 
   // Built as the sheet opens, so the tap on "Back up" can hand it straight to the
   // share sheet — Safari refuses one that opens after an await.
@@ -44,6 +46,9 @@ export function DataRows() {
   async function backUp() {
     try {
       const { name, rows } = await exportBackup(prepared);
+      // Remembered so Settings can say how old the latest copy is. If only this
+      // fails, the file still saved — don't report the backup as failed.
+      setLastBackup(new Date().toISOString()).catch((e: unknown) => console.error('backup date save failed', e));
       setError(null);
       toast(`Saved ${name} — ${rows} rows.`, { durationMs: 5000 });
     } catch (e) {
@@ -101,7 +106,11 @@ export function DataRows() {
       <DisclosureRow
         icon={<DownloadIcon color={colors.rose} />}
         title="Back up my data"
-        hint="Everything as one JSON file"
+        hint={
+          lastBackup
+            ? `Last saved ${formatDistanceToNowStrict(new Date(lastBackup), { addSuffix: true })}`
+            : 'Never saved — keep a copy somewhere safe'
+        }
         onPress={backUp}
       />
       <DisclosureRow

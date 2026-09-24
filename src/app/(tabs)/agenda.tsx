@@ -18,7 +18,7 @@ import { ScreenHeader } from '@/components/ui';
 import { useCategories } from '@/hooks/useCategories';
 import { useNow } from '@/hooks/useNow';
 import { useSetting } from '@/hooks/useSettings';
-import { useTimeBlocksForDay } from '@/hooks/useTimeBlocks';
+import { useTimeBlocksForDay, useTrackingStart } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, tintFor } from '@/lib/colors';
 import { findGaps, formatDuration } from '@/lib/time';
 
@@ -41,7 +41,11 @@ export default function AgendaScreen() {
   const { blocks, loaded } = useTimeBlocksForDay(selected);
   // Stops at now: an hour that hasn't happened can't be logged, so it isn't a gap.
   // Nothing until the first read lands — a whole day of dashed gaps would flash.
-  const gaps = useMemo(() => (loaded ? findGaps(blocks, selected, now) : []), [loaded, blocks, selected, now]);
+  const trackingStart = useTrackingStart();
+  const gaps = useMemo(
+    () => (loaded ? findGaps(blocks, selected, { from: trackingStart, until: now }) : []),
+    [loaded, blocks, selected, trackingStart, now]
+  );
 
   const isToday = isSameDay(selected, now);
   const nowMinutes = differenceInMinutes(now, startOfDay(now));
@@ -129,7 +133,17 @@ export default function AgendaScreen() {
 
         <View style={styles.summary}>
           <Text style={styles.summaryLeft}>{isToday ? 'Today' : format(selected, 'EEEE, MMM d')}</Text>
-          <Text style={styles.summaryRight}>{formatDuration(totalGapMinutes)} not logged</Text>
+          <Text style={styles.summaryRight}>
+            {!trackingStart
+              ? 'Nothing logged yet'
+              : addDays(selected, 1) <= trackingStart
+                ? 'Before your first entry'
+                : selected > now
+                  ? 'Not here yet'
+                  : totalGapMinutes === 0
+                    ? 'All logged'
+                    : `${formatDuration(totalGapMinutes)} not logged`}
+          </Text>
         </View>
       </View>
 

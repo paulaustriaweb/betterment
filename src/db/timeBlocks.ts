@@ -34,6 +34,12 @@ export async function getLastTimeBlock(): Promise<TimeBlock | null> {
   return row ? toTimeBlock(row) : null;
 }
 
+/** When the very first entry starts — the moment tracking began. Null before any. */
+export async function getFirstStart(): Promise<string | null> {
+  const row = await getDb().getFirstAsync<{ first: string | null }>('SELECT MIN(start_time) AS first FROM time_blocks');
+  return row?.first ?? null;
+}
+
 export interface TimeBlockInput {
   startTime: string;
   endTime: string;
