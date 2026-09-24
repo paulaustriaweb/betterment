@@ -24,7 +24,7 @@ import { colors } from '@/lib/colors';
 import { addReminderTapListener } from '@/lib/notifications';
 import { setHapticsEnabled } from '@/lib/haptics';
 import { registerServiceWorker } from '@/lib/serviceWorker';
-import { hideLaunchScreen, requestPersistentStorage } from '@/lib/webShell';
+import { hideLaunchScreen, requestPersistentStorage, setLaunchStatus } from '@/lib/webShell';
 
 /**
  * Settings and categories are tiny and every screen reads them, so they load
@@ -32,7 +32,9 @@ import { hideLaunchScreen, requestPersistentStorage } from '@/lib/webShell';
  */
 async function startDb(): Promise<void> {
   requestPersistentStorage();
+  setLaunchStatus('Opening your day…');
   await initDb();
+  setLaunchStatus('Counting the hours…');
   const settings = await listSettings();
   primeQuery(SETTINGS_KEY, settings);
   setHapticsEnabled(settings.haptics !== '0');

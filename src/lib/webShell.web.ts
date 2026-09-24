@@ -1,20 +1,53 @@
-/** Long enough to register as the app opening, rather than a flicker. */
-const MIN_VISIBLE_MS = 800;
-
 /**
  * The launch screen lives in the HTML itself (+html.tsx) so it shows the instant the
- * page opens, while the 1.7 MB bundle downloads and parses. Faded out once the app
- * has its database and fonts.
+ * page opens. Its sequence takes about two seconds to play; it stays at least that
+ * long so opening the app feels like opening it, not a flicker. Tap to skip.
  */
-export function hideLaunchScreen(): void {
-  const el = document.getElementById('launch');
-  if (!el) return;
-  // performance.now() counts from navigation start, so a slow load waits no longer.
-  const wait = Math.max(0, MIN_VISIBLE_MS - performance.now());
+const MIN_VISIBLE_MS = 2100;
+/** Reduce Motion: nothing to watch, so no reason to wait long. */
+const MIN_VISIBLE_REDUCED_MS = 700;
+
+let ready = false;
+let skipped = false;
+let finished = false;
+
+function launch(): HTMLElement | null {
+  return typeof document === 'undefined' ? null : document.getElementById('launch');
+}
+
+function finish(): void {
+  const el = launch();
+  if (!el || finished) return;
+  finished = true;
+  el.classList.add('gone');
+  setTimeout(() => el.remove(), 450);
+}
+
+// Tap to skip: gone at once if the app is ready, otherwise the moment it is.
+launch()?.addEventListener('click', () => {
+  skipped = true;
+  if (ready) finish();
+});
+
+/** The line under the logo, following the real loading steps. */
+export function setLaunchStatus(text: string): void {
+  const el = typeof document === 'undefined' ? null : document.getElementById('launch-status');
+  if (!el || el.textContent === text) return;
+  el.style.opacity = '0';
   setTimeout(() => {
-    el.classList.add('gone');
-    setTimeout(() => el.remove(), 400);
-  }, wait);
+    el.textContent = text;
+    el.style.opacity = '1';
+  }, 140);
+}
+
+export function hideLaunchScreen(): void {
+  if (ready) return;
+  ready = true;
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  // performance.now() counts from navigation start, so a slow load waits no longer.
+  const wait = skipped ? 0 : Math.max(0, (reduced ? MIN_VISIBLE_REDUCED_MS : MIN_VISIBLE_MS) - performance.now());
+  setTimeout(() => setLaunchStatus('Ready'), Math.max(0, wait - 380));
+  setTimeout(finish, wait);
 }
 
 /**
