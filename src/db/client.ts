@@ -16,8 +16,3 @@ export function getDb(): SQLiteDatabase {
   if (!db) throw new Error('Database used before initDb() finished.');
   return db;
 }
-
-/** Forgets the connection so the next openDb() starts from scratch — after a failed open. */
-export function forgetDb(): void {
-  db = null;
-}

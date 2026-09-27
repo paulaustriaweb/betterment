@@ -14,7 +14,7 @@ import { useEffect, useState } from 'react';
 import { ErrorScreen } from '@/components/ErrorScreen';
 import { ToastProvider } from '@/components/Toast';
 import { listCategories } from '@/db/categories';
-import { initDb } from '@/db/init';
+import { ALREADY_OPEN, initDb } from '@/db/init';
 import { listSettings } from '@/db/settings';
 import { CATEGORIES_KEY } from '@/hooks/useCategories';
 import { primeQuery } from '@/hooks/useDbQuery';
@@ -23,7 +23,14 @@ import { colors } from '@/lib/colors';
 import { addReminderTapListener } from '@/lib/notifications';
 import { setHapticsEnabled } from '@/lib/haptics';
 import { registerServiceWorker } from '@/lib/serviceWorker';
-import { hideLaunchScreen, requestPersistentStorage, setLaunchStatus } from '@/lib/webShell';
+import {
+  hideLaunchScreen,
+  markStarted,
+  requestPersistentStorage,
+  restartApp,
+  retryWithFreshPage,
+  setLaunchStatus,
+} from '@/lib/webShell';
 
 /**
  * Settings and categories are tiny and every screen reads them, so they load
@@ -61,8 +68,15 @@ export default function RootLayout() {
 
   useEffect(() => {
     startDb().then(
-      () => setDbReady(true),
-      (e: Error) => setDbError(e)
+      () => {
+        markStarted();
+        setDbReady(true);
+      },
+      (e: Error) => {
+        // Usually the previous page still letting go: reload quietly and try again.
+        if (e.name === ALREADY_OPEN && retryWithFreshPage()) return;
+        setDbError(e);
+      }
     );
   }, [dbAttempt]);
 
@@ -94,6 +108,9 @@ export default function RootLayout() {
         <ErrorScreen
           error={dbError}
           retry={() => {
+            // On web the database worker can't reopen after a failed open; a fresh
+            // page is the only real retry.
+            if (restartApp()) return;
             setDbError(null);
             setDbAttempt((n) => n + 1);
           }}

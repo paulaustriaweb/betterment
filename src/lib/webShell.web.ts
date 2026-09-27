@@ -50,6 +50,57 @@ export function hideLaunchScreen(): void {
   setTimeout(finish, wait);
 }
 
+const RELOAD_KEY = 'betterment-lock-reloads';
+const MAX_RELOADS = 3;
+const RELOAD_WINDOW_MS = 20_000;
+
+/**
+ * A locked database at startup is usually the previous page still letting go of it —
+ * a reload or quick relaunch. expo-sqlite's worker can't retry an open once one has
+ * failed, so the only real retry is a fresh page. A few quick reloads, behind the
+ * launch screen, cover that handover; past that it really is another tab, and the
+ * caller shows so. Returns whether a reload is on its way.
+ */
+export function retryWithFreshPage(): boolean {
+  let state = { count: 0, since: Date.now() };
+  try {
+    const raw = sessionStorage.getItem(RELOAD_KEY);
+    if (raw) state = JSON.parse(raw) as typeof state;
+  } catch {
+    return false;
+  }
+  if (Date.now() - state.since > RELOAD_WINDOW_MS) state = { count: 0, since: Date.now() };
+  if (state.count >= MAX_RELOADS) return false;
+  state.count += 1;
+  try {
+    sessionStorage.setItem(RELOAD_KEY, JSON.stringify(state));
+  } catch {
+    return false;
+  }
+  setLaunchStatus('Waiting for the last session to close…');
+  setTimeout(() => window.location.reload(), 400 * state.count);
+  return true;
+}
+
+/** Opened fine — the next lock gets a full set of retries again. */
+export function markStarted(): void {
+  try {
+    sessionStorage.removeItem(RELOAD_KEY);
+  } catch {
+    // Nothing to clear.
+  }
+}
+
+/**
+ * "Try again" on web: a fresh page, since the worker can't reopen in place — with a
+ * full set of quiet retries, in case the other tab is still letting go.
+ */
+export function restartApp(): boolean {
+  markStarted();
+  window.location.reload();
+  return true;
+}
+
 /**
  * Asks the browser not to evict this site's storage under pressure — the database
  * is the only copy of everything logged. Home-screen apps are usually exempt from
