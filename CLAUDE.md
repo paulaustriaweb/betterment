@@ -468,9 +468,19 @@ survived.
   `TrendChart` — monotone curve (`lib/curve.ts`, never overshoots its data), drawn up
   to today only, dashed zero line, scrub to read any day. Data in `lib/chartData.ts`.
   Both are plain Views/SVG — still no chart library, still no gradients.
-- **DB open retries a transient lock** (`db/init.ts`): a reload or quick relaunch can
-  start before the old page releases OPFS; it retries for ~3s before "Open somewhere
-  else". Reproduced in headless Edge before the fix, gone after.
+- **A locked database at startup reloads the page, never retries in place.** A reload
+  or quick relaunch can start before the old page releases OPFS. Once an open fails,
+  expo-sqlite's worker keeps a half-initialised engine and every later open in that
+  page throws "Invalid VFS state" — so `retryWithFreshPage` (`lib/webShell.web.ts`)
+  reloads quietly up to 3× in 20s behind the launch screen, then shows "Open
+  somewhere else"; its Try again is a fresh page with a fresh budget. Verified in
+  headless Edge: rapid reloads recover, a real second tab gets the message, and Try
+  again gets in once the first tab closes.
+- **Overview layout** (2026-09-27, from a device screenshot): five blocks — the
+  Targets row became the tappable pink card (StatCard `onPress`); cards never repeat
+  the hero's number; hero caption is one line; header spends the safe-area inset
+  once, not twice. Checked to fit above the tab bar at 390×775, 414×826 and 375×659
+  (iPhone 13 / XR / SE minus notch and home bar) on Overview, Money and Goals.
 - 2026-09-27 optimisation: web bundle 1,717 → ~1,510 KB (date-fns per-function imports,
   `notifications.web.ts` stub instead of expo-notifications).
 - Launch screen in `+html.tsx` (removed by `hideLaunchScreen` once ready), persistent

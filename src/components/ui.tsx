@@ -32,9 +32,10 @@ export function ScreenHeader({
 }) {
   // Some iOS versions start a home-screen web app under the status bar; without
   // this the title sat on top of the clock. Zero where the view starts below it.
+  // The screen's own top padding already clears part of it, so don't pay twice.
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.headerRow, { marginTop: insets.top }]}>
+    <View style={[styles.headerRow, { marginTop: Math.max(0, insets.top - 12) }]}>
       <View>
         <Text style={styles.headerTitle}>{title}</Text>
         {subtitle ? <Text style={styles.headerSubtitle}>{subtitle}</Text> : null}
@@ -79,14 +80,39 @@ export function RangePills({
   );
 }
 
-/** Half-width stat card. `ink` is the dark one, `pop` the bright pink one. */
-export function StatCard({ label, value, tone }: { label: string; value: string; tone: 'ink' | 'pop' }) {
+/**
+ * Half-width stat card. `ink` is the dark one, `pop` the bright pink one. With
+ * `onPress` it opens the detail behind the figure — one less row on the screen.
+ */
+export function StatCard({
+  label,
+  value,
+  tone,
+  onPress,
+}: {
+  label: string;
+  value: string;
+  tone: 'ink' | 'pop';
+  onPress?: () => void;
+}) {
   const bg = tone === 'ink' ? colors.ink : colors.rosePop;
   const fg = tone === 'ink' ? colors.surface : colors.ink;
   const labelColor = tone === 'ink' ? 'rgba(255,255,255,0.80)' : colors.ink;
   return (
     // `accessible` collapses the label and the figure into one announcement.
-    <View style={[styles.statCard, { backgroundColor: bg }]} accessible accessibilityLabel={`${label}: ${value}`}>
+    <Pressable
+      style={({ pressed }) => [styles.statCard, { backgroundColor: bg }, pressed && onPress ? styles.statPressed : null]}
+      onPress={onPress}
+      disabled={!onPress}
+      accessible
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={`${label}: ${value}`}
+    >
+      {onPress ? (
+        <View style={styles.statChevron}>
+          <ChevronRightIcon color={labelColor} size={14} />
+        </View>
+      ) : null}
       <Text style={[styles.statLabel, { color: labelColor }]}>{label}</Text>
       {/* Shrink rather than wrap — a figure broken across two lines is unreadable. */}
       <Text
@@ -95,7 +121,7 @@ export function StatCard({ label, value, tone }: { label: string; value: string;
       >
         {value}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -224,6 +250,8 @@ const styles = StyleSheet.create({
   pillLabel: { fontSize: 12.5, fontWeight: '600' },
 
   statCard: { flex: 1, borderRadius: 22, padding: spacing.cardPadding },
+  statPressed: { opacity: 0.85 },
+  statChevron: { position: 'absolute', top: spacing.cardPadding, right: 14 },
   statLabel: { ...type.label },
   statValue: { ...type.stat, marginTop: 9, fontVariant: ['tabular-nums'] },
 

@@ -9,7 +9,7 @@ import { startOfYear } from 'date-fns/startOfYear';
 import { subDays } from 'date-fns/subDays';
 import { subMonths } from 'date-fns/subMonths';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { AddTransactionSheet } from '@/components/AddTransactionSheet';
 import { Banner } from '@/components/Banner';
@@ -45,6 +45,8 @@ export default function MoneyScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const toast = useToast();
   const [currency] = useSetting('currency', 'PHP');
+  // Small phones (iPhone SE) get a shorter chart so the screen still fits.
+  const compact = useWindowDimensions().height < 720;
   const [weekStartSetting] = useSetting('week_starts_on', '0');
 
   const { rangeStart, rangeEnd } = useMemo(() => {
@@ -144,7 +146,7 @@ export default function MoneyScreen() {
           </View>
 
           <Text
-            style={[styles.heroValue, { fontSize: fitFontSize(formatSigned(net, currency), 44, 9) }]}
+            style={[styles.heroValue, { fontSize: fitFontSize(formatSigned(net, currency), 42, 9) }]}
             numberOfLines={1}
           >
             {formatSigned(net, currency)}
@@ -160,6 +162,7 @@ export default function MoneyScreen() {
                 slots={trend.slots}
                 labels={trend.labels}
                 format={(v) => formatSigned(v, currency)}
+                height={compact ? 72 : 96}
               />
             </View>
           ) : (
@@ -289,9 +292,9 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.ground },
   content: { flex: 1, paddingTop: 26, paddingHorizontal: spacing.gutter },
 
-  pills: { marginTop: 18 },
+  pills: { marginTop: 16 },
 
-  hero: { backgroundColor: colors.rose, borderRadius: 26, padding: 20, marginTop: 18 },
+  hero: { backgroundColor: colors.rose, borderRadius: 26, padding: 18, paddingBottom: 12, marginTop: 16 },
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   heroChip: {
@@ -306,17 +309,17 @@ const styles = StyleSheet.create({
   heroRange: { fontFamily: font.regular, fontSize: 11, color: 'rgba(255,255,255,0.75)' },
   heroValue: {
     ...type.display,
-    fontSize: 44,
-    letterSpacing: -2,
+    fontSize: 42,
+    letterSpacing: -1.8,
     color: colors.surface,
-    marginTop: 16,
+    marginTop: 12,
     fontVariant: ['tabular-nums'],
   },
   heroSub: { fontFamily: font.regular, fontSize: 12, color: 'rgba(255,255,255,0.78)', marginTop: 4 },
   heroEmpty: { fontFamily: font.regular, fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 18 },
   spark: { marginTop: 12 },
 
-  statRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  statRow: { flexDirection: 'row', gap: 10, marginTop: 11 },
   disclosure: { marginTop: 18 },
   action: { marginTop: 'auto', marginBottom: 20 },
 

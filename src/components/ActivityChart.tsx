@@ -7,7 +7,7 @@ import * as haptics from '@/lib/haptics';
 import { formatDuration } from '@/lib/time';
 import type { Category } from '@/lib/types';
 
-const HEIGHT = 92;
+const DEFAULT_HEIGHT = 92;
 
 interface Props {
   columns: Column[];
@@ -20,6 +20,7 @@ interface Props {
   onSelect: (index: number | null) => void;
   /** Changes when the range does, replaying the bars growing in. */
   animateKey: string;
+  height?: number;
 }
 
 /**
@@ -27,7 +28,16 @@ interface Props {
  * logged in it, out of its full length. The empty part of a bar is the unlogged time.
  * Touch and drag across to read any bar.
  */
-export function ActivityChart({ columns, categories, axis, average, selected, onSelect, animateKey }: Props) {
+export function ActivityChart({
+  columns,
+  categories,
+  axis,
+  average,
+  selected,
+  onSelect,
+  animateKey,
+  height = DEFAULT_HEIGHT,
+}: Props) {
   const [width, setWidth] = useState(0);
   const [grow] = useState(() => new Animated.Value(1));
   const [moved, setMoved] = useState(false);
@@ -79,7 +89,7 @@ export function ActivityChart({ columns, categories, axis, average, selected, on
   return (
     <View>
       <View
-        style={styles.plot}
+        style={{ height }}
         onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
         onStartShouldSetResponder={() => true}
         onMoveShouldSetResponder={() => true}
@@ -119,7 +129,7 @@ export function ActivityChart({ columns, categories, axis, average, selected, on
                     styles.fill,
                     {
                       borderRadius: radius,
-                      height: grow.interpolate({ inputRange: [0, 1], outputRange: [0, (HEIGHT * c.total) / c.capacity] }),
+                      height: grow.interpolate({ inputRange: [0, 1], outputRange: [0, (height * c.total) / c.capacity] }),
                     },
                   ]}
                 >
@@ -133,7 +143,7 @@ export function ActivityChart({ columns, categories, axis, average, selected, on
         </View>
 
         {average !== null && average > 0 ? (
-          <View style={[styles.average, { bottom: Math.min(HEIGHT - 1, (HEIGHT * average) / capacity) }]} pointerEvents="none">
+          <View style={[styles.average, { bottom: Math.min(height - 1, (height * average) / capacity) }]} pointerEvents="none">
             <Text style={styles.averageLabel}>avg {formatDuration(average)}</Text>
           </View>
         ) : null}
@@ -155,7 +165,6 @@ export function ActivityChart({ columns, categories, axis, average, selected, on
 }
 
 const styles = StyleSheet.create({
-  plot: { height: HEIGHT },
   bars: { flex: 1, flexDirection: 'row', alignItems: 'flex-end' },
   track: {
     flex: 1,

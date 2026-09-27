@@ -12,7 +12,7 @@ import { subMonths } from 'date-fns/subMonths';
 import { subWeeks } from 'date-fns/subWeeks';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { CategoriesSheet } from '@/components/CategoriesSheet';
 import { ActivityChart } from '@/components/ActivityChart';
@@ -20,7 +20,7 @@ import { ReminderSheet } from '@/components/ReminderSheet';
 import { SettingsSheet } from '@/components/SettingsSheet';
 import { TargetsSheet } from '@/components/TargetsSheet';
 import { WhereItWentSheet } from '@/components/WhereItWentSheet';
-import { CheckIcon, GearIcon, PlusIcon, TimelineIcon } from '@/components/icons';
+import { GearIcon, PlusIcon, TimelineIcon } from '@/components/icons';
 import { DisclosureRow, PrimaryButton, RangePills, ScreenHeader, StatCard } from '@/components/ui';
 import { useCategories } from '@/hooks/useCategories';
 import { useNow } from '@/hooks/useNow';
@@ -44,6 +44,8 @@ export default function OverviewScreen() {
   const router = useRouter();
   const now = useNow();
   const [range, setRange] = useState('today');
+  // Small phones (iPhone SE) get a shorter chart so the screen still fits.
+  const compact = useWindowDimensions().height < 720;
   // The bar being read on the chart — null shows the summary.
   const [selectedBar, setSelectedBar] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -164,35 +166,38 @@ export default function OverviewScreen() {
   const leader = report.slices[0];
   const isToday = range === 'today';
 
+  // The header already carries today's date; the hero says what span it covers.
   const rangeCaption = isToday
     ? lateNight
-      ? `${format(rangeStart, 'EEE, MMM d')} – now`
-      : format(now, 'EEE, MMM d')
+      ? `${format(rangeStart, 'EEE')} – now`
+      : 'Since midnight'
     : range === 'week'
       ? `${format(rangeStart, 'MMM d')} – ${format(subDays(rangeEnd, 1), 'MMM d')}`
       : format(rangeStart, 'MMMM');
 
+  // One line, always: a caption that wraps or truncates is worse than a short one.
   const heroCaption = leader
-    ? `${nameOf(leader.categoryId)} leads · ${share(leader.minutes)}% of what you logged`
+    ? report.slices.length === 1
+      ? `All ${nameOf(leader.categoryId)}`
+      : `${nameOf(leader.categoryId)} leads · ${share(leader.minutes)}%`
     : isToday
       ? 'Nothing yet — log your day before bed.'
       : `Nothing logged ${range === 'week' ? 'this week' : 'this month'} yet.`;
 
-  // Today: what led, and where tonight's logging picks up. Longer ranges: the
-  // average day, and what went unlogged on days that are already over.
+  // Left: where tonight's logging picks up (today) or the average day (week/month) —
+  // never a repeat of the hero's number. Right: targets, which open on tap; that card
+  // replaced a whole row, keeping the screen to five blocks.
+  const until = report.loggedUntil;
   const leftCard = isToday
-    ? { label: leader ? nameOf(leader.categoryId) : 'Top activity', value: leader ? formatHoursPadded(leader.minutes) : '—' }
+    ? { label: 'Logged until', value: until ? format(until, isSameDay(until, now) ? 'h:mm a' : 'EEE h:mm a') : '—' }
     : {
         label: 'Daily average',
         value: report.trackedDays > 0 ? formatHoursPadded(report.logged / report.trackedDays) : '—',
       };
-  const until = report.loggedUntil;
-  const rightCard = isToday
-    ? {
-        label: 'Logged until',
-        value: until ? format(until, isSameDay(until, now) ? 'h:mm a' : 'EEE h:mm a') : '—',
-      }
-    : { label: 'Not logged', value: trackingStart ? formatDuration(report.unloggedPast) : '—' };
+  const rightCard =
+    targets.length === 0
+      ? { label: 'Daily targets', value: 'Add one' }
+      : { label: 'Targets met', value: targetChecks === 0 ? '—' : `${targetsMet} of ${targetChecks}` };
 
   // One blank frame on a cold start beats a report computed from nothing.
   if (!loaded) return <View style={styles.screen} />;
@@ -241,7 +246,7 @@ export default function OverviewScreen() {
           <Text
             style={[
               styles.heroValue,
-              { fontSize: fitFontSize(formatHoursPadded(bar ? bar.total : report.logged), 48, 8) },
+              { fontSize: fitFontSize(formatHoursPadded(bar ? bar.total : report.logged), 42, 8) },
             ]}
             numberOfLines={1}
           >
@@ -260,13 +265,14 @@ export default function OverviewScreen() {
               selected={selectedBar}
               onSelect={setSelectedBar}
               animateKey={`${range}|${rangeStart.toISOString()}`}
+              height={compact ? 54 : 70}
             />
           </View>
         </View>
 
         <View style={styles.statRow}>
           <StatCard label={leftCard.label} value={leftCard.value} tone="ink" />
-          <StatCard label={rightCard.label} value={rightCard.value} tone="pop" />
+          <StatCard label={rightCard.label} value={rightCard.value} tone="pop" onPress={() => setTargetsOpen(true)} />
         </View>
 
         <View style={styles.disclosure}>
@@ -283,18 +289,6 @@ export default function OverviewScreen() {
                     : `${report.slices.length} ${report.slices.length === 1 ? 'activity' : 'activities'} · tap to see`
             }
             onPress={() => setSheetOpen(true)}
-          />
-          <DisclosureRow
-            icon={<CheckIcon color={colors.rose} />}
-            title={targets.length === 0 ? 'Set daily targets' : 'Targets'}
-            hint={
-              targets.length === 0
-                ? 'Like Sleep 7h, or Scrolling under 2h'
-                : targetChecks === 0
-                  ? 'Nothing to check yet'
-                  : `${targetsMet} of ${targetChecks} met${isToday ? '' : range === 'week' ? ' this week' : ' this month'}`
-            }
-            onPress={() => setTargetsOpen(true)}
           />
         </View>
 
@@ -354,7 +348,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.ground },
   content: { flex: 1, paddingTop: 26, paddingHorizontal: spacing.gutter },
 
-  pills: { marginTop: 18 },
+  pills: { marginTop: 16 },
   dueDot: {
     position: 'absolute',
     top: 3,
@@ -375,7 +369,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  hero: { backgroundColor: colors.rose, borderRadius: 26, padding: 20, marginTop: 18 },
+  hero: { backgroundColor: colors.rose, borderRadius: 26, padding: 18, paddingBottom: 12, marginTop: 16 },
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   heroLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   heroChip: {
@@ -390,16 +384,16 @@ const styles = StyleSheet.create({
   heroRange: { fontFamily: font.regular, fontSize: 11, color: 'rgba(255,255,255,0.75)' },
   heroValue: {
     ...type.display,
-    fontSize: 48,
-    letterSpacing: -2.2,
+    fontSize: 42,
+    letterSpacing: -1.8,
     color: colors.surface,
-    marginTop: 16,
+    marginTop: 12,
     fontVariant: ['tabular-nums'],
   },
-  bar: { marginTop: 14 },
+  bar: { marginTop: 12 },
   heroSub: { fontFamily: font.regular, fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 4, lineHeight: 17 },
 
-  statRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
-  disclosure: { marginTop: 18, gap: 8 },
+  statRow: { flexDirection: 'row', gap: 10, marginTop: 11 },
+  disclosure: { marginTop: 11 },
   action: { marginTop: 'auto', marginBottom: 20 },
 });
