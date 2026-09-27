@@ -1,4 +1,6 @@
-import { addDays, set, startOfDay } from 'date-fns';
+import { addDays } from 'date-fns/addDays';
+import { set } from 'date-fns/set';
+import { startOfDay } from 'date-fns/startOfDay';
 
 export interface Clock {
   hour: number; // 0-23 if the meridiem is known, otherwise 1-12 as typed

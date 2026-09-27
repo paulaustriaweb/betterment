@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 
-import { useDbVersion } from './DbVersionContext';
+import { useTablesVersion, type Table } from './tableVersions';
 
 /** Last value seen per key, across every hook — revisiting a day or range is instant. */
 const cache = new Map<string, unknown>();
 
 /**
- * One read per key per dbVersion, shared by every hook asking for it. A dozen
+ * One read per key per table version, shared by every hook asking for it. A dozen
  * components read settings; without this each write fired a dozen identical
  * queries at the worker and re-rendered once per answer.
  */
@@ -46,7 +46,7 @@ interface State<T> {
 }
 
 /**
- * Reads SQLite in an effect and re-reads after every write (via dbVersion).
+ * Reads SQLite in an effect and re-reads after every write to `tables`.
  *
  * Reads used to run during render against the sync API, so a stalled read threw
  * during render and took the app down. Async reads can't block, and a failed one
@@ -58,8 +58,8 @@ interface State<T> {
  * show a number computed from nothing. `read` must be
  * stable for a given key — wrap it in useCallback keyed on the same inputs.
  */
-export function useDbQuery<T>(key: string, read: () => Promise<T>, fallback: T) {
-  const { version } = useDbVersion();
+export function useDbQuery<T>(key: string, tables: Table[], read: () => Promise<T>, fallback: T) {
+  const version = useTablesVersion(tables);
   const [state, setState] = useState<State<T>>(() =>
     cache.has(key)
       ? { key, data: cache.get(key) as T, current: true, loaded: true }

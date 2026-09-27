@@ -1,4 +1,7 @@
-import { format, isToday, isYesterday, startOfDay } from 'date-fns';
+import { format } from 'date-fns/format';
+import { isToday } from 'date-fns/isToday';
+import { isYesterday } from 'date-fns/isYesterday';
+import { startOfDay } from 'date-fns/startOfDay';
 import * as haptics from '@/lib/haptics';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';

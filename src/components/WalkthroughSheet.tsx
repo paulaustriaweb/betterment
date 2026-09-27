@@ -1,4 +1,7 @@
-import { addMinutes, differenceInMinutes, format, isSameDay } from 'date-fns';
+import { addMinutes } from 'date-fns/addMinutes';
+import { differenceInMinutes } from 'date-fns/differenceInMinutes';
+import { format } from 'date-fns/format';
+import { isSameDay } from 'date-fns/isSameDay';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 

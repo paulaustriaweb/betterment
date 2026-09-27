@@ -1,4 +1,7 @@
-import { format, isSameDay, isToday, isYesterday } from 'date-fns';
+import { format } from 'date-fns/format';
+import { isSameDay } from 'date-fns/isSameDay';
+import { isToday } from 'date-fns/isToday';
+import { isYesterday } from 'date-fns/isYesterday';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, font } from '@/lib/colors';

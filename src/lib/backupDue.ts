@@ -1,4 +1,4 @@
-import { differenceInCalendarDays } from 'date-fns';
+import { differenceInCalendarDays } from 'date-fns/differenceInCalendarDays';
 
 /**
  * Whether it's time to save a backup. Browser storage can be wiped by "clear website

@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format } from 'date-fns/format';
 import { StyleSheet, Text } from 'react-native';
 
 import { colors, font } from '@/lib/colors';

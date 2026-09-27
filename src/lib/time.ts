@@ -1,4 +1,7 @@
-import { addDays, differenceInMinutes, format, startOfDay } from 'date-fns';
+import { addDays } from 'date-fns/addDays';
+import { differenceInMinutes } from 'date-fns/differenceInMinutes';
+import { format } from 'date-fns/format';
+import { startOfDay } from 'date-fns/startOfDay';
 
 import type { TimeBlock } from './types';
 

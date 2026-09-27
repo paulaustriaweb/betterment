@@ -1,4 +1,4 @@
-import { set } from 'date-fns';
+import { set } from 'date-fns/set';
 
 import type { Transaction } from './types';
 

@@ -2,14 +2,15 @@ import { useCallback } from 'react';
 
 import { deleteGoal, insertGoal, listGoals, setGoalComplete, updateGoal } from '@/db/goals';
 import type { Goal } from '@/lib/types';
-import { useWrite } from './DbVersionContext';
+import { useWrite, type Table } from './tableVersions';
 import { useDbQuery } from './useDbQuery';
 
 const NONE: Goal[] = [];
+const GOALS: Table[] = ['goals'];
 
 export function useGoals() {
-  const write = useWrite();
-  const { data: goals, loaded } = useDbQuery('goals', listGoals, NONE);
+  const write = useWrite(GOALS);
+  const { data: goals, loaded } = useDbQuery('goals', GOALS, listGoals, NONE);
 
   const add = useCallback(
     (title: string, deadlineIso: string, createdAt?: string) =>

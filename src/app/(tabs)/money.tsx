@@ -1,15 +1,13 @@
-import {
-  addDays,
-  addMonths,
-  addYears,
-  eachDayOfInterval,
-  eachMonthOfInterval,
-  format,
-  startOfMonth,
-  startOfYear,
-  subDays,
-  subMonths,
-} from 'date-fns';
+import { addDays } from 'date-fns/addDays';
+import { addMonths } from 'date-fns/addMonths';
+import { addYears } from 'date-fns/addYears';
+import { eachDayOfInterval } from 'date-fns/eachDayOfInterval';
+import { eachMonthOfInterval } from 'date-fns/eachMonthOfInterval';
+import { format } from 'date-fns/format';
+import { startOfMonth } from 'date-fns/startOfMonth';
+import { startOfYear } from 'date-fns/startOfYear';
+import { subDays } from 'date-fns/subDays';
+import { subMonths } from 'date-fns/subMonths';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 

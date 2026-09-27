@@ -1,10 +1,11 @@
-import { format, formatDistanceToNowStrict } from 'date-fns';
+import { format } from 'date-fns/format';
+import { formatDistanceToNowStrict } from 'date-fns/formatDistanceToNowStrict';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { buildBackup, restoreBackup } from '@/db/backup';
 import { countDuplicates, eraseLoggedData, removeDuplicates } from '@/db/duplicates';
-import { useDbVersion, useWrite } from '@/hooks/DbVersionContext';
+import { ALL_TABLES, useTablesVersion, useWrite, type Table } from '@/hooks/tableVersions';
 import { useDbQuery } from '@/hooks/useDbQuery';
 import { useSetting } from '@/hooks/useSettings';
 import { useSubmitGuard } from '@/hooks/useSubmitGuard';
@@ -16,13 +17,16 @@ import { useToast } from './Toast';
 import { DownloadIcon, TimelineIcon, TrashIcon } from './icons';
 import { DisclosureRow } from './ui';
 
+const DUPLICATE_TABLES: Table[] = ['time', 'goals'];
+
 /** Backup, restore and duplicate clean-up — the rows in Settings that touch everything. */
 export function DataRows() {
   const toast = useToast();
-  const write = useWrite();
+  // Restore and erase replace everything, so every table's readers refresh.
+  const write = useWrite(ALL_TABLES);
   const submit = useSubmitGuard();
-  const { version } = useDbVersion();
-  const duplicates = useDbQuery('duplicates', countDuplicates, 0).data;
+  const version = useTablesVersion(ALL_TABLES);
+  const duplicates = useDbQuery('duplicates', DUPLICATE_TABLES, countDuplicates, 0).data;
   const [prepared, setPrepared] = useState<Backup | null>(null);
   const [restoring, setRestoring] = useState<Backup | null>(null);
   const [erasing, setErasing] = useState(false);

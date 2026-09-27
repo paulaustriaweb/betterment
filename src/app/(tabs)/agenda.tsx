@@ -1,14 +1,12 @@
-import {
-  addDays,
-  addMinutes,
-  addWeeks,
-  differenceInMinutes,
-  format,
-  isSameDay,
-  startOfDay,
-  startOfWeek,
-  subWeeks,
-} from 'date-fns';
+import { addDays } from 'date-fns/addDays';
+import { addMinutes } from 'date-fns/addMinutes';
+import { addWeeks } from 'date-fns/addWeeks';
+import { differenceInMinutes } from 'date-fns/differenceInMinutes';
+import { format } from 'date-fns/format';
+import { isSameDay } from 'date-fns/isSameDay';
+import { startOfDay } from 'date-fns/startOfDay';
+import { startOfWeek } from 'date-fns/startOfWeek';
+import { subWeeks } from 'date-fns/subWeeks';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';

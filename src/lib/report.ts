@@ -1,4 +1,5 @@
-import { differenceInCalendarDays, startOfDay } from 'date-fns';
+import { differenceInCalendarDays } from 'date-fns/differenceInCalendarDays';
+import { startOfDay } from 'date-fns/startOfDay';
 
 import { capAtNow, loggedMinutesInRange, minutesByCategory, unloggedBetween } from './time';
 import type { TimeBlock } from './types';

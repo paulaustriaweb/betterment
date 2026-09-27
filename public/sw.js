@@ -36,16 +36,33 @@ self.addEventListener('activate', (event) => {
 // first visit is enough to launch offline next time.
 self.addEventListener('message', (event) => {
   if (!event.data || event.data.type !== 'cache' || !Array.isArray(event.data.urls)) return;
+  const urls = event.data.urls.filter((url) => new URL(url, self.location.origin).origin === self.location.origin);
   event.waitUntil(
-    caches.open(CACHE).then((cache) =>
-      Promise.all(
-        event.data.urls
-          .filter((url) => new URL(url, self.location.origin).origin === self.location.origin)
-          .map((url) => cache.add(url).catch(() => undefined))
-      )
-    )
+    caches.open(CACHE).then(async (cache) => {
+      await Promise.all(urls.map((url) => cache.add(url).catch(() => undefined)));
+      await pruneOldBundles(cache, urls);
+    })
   );
 });
+
+// Each deploy adds a new ~1.5 MB app bundle and nothing ever removed the old ones.
+// Once the page has reported which bundle it runs, any other one is dead weight.
+const BUNDLE = /^\/_expo\/static\/js\/web\/entry-[^/]+\.js$/;
+
+async function pruneOldBundles(cache, urls) {
+  const current = new Set(urls.map((url) => new URL(url, self.location.origin).pathname).filter((p) => BUNDLE.test(p)));
+  // Never prune blind: without the running bundle in the list, keep everything.
+  if (current.size === 0) return;
+  const cached = await cache.keys();
+  await Promise.all(
+    cached
+      .filter((request) => {
+        const path = new URL(request.url).pathname;
+        return BUNDLE.test(path) && !current.has(path);
+      })
+      .map((request) => cache.delete(request))
+  );
+}
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;

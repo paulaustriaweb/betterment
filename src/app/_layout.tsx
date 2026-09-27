@@ -16,7 +16,6 @@ import { ToastProvider } from '@/components/Toast';
 import { listCategories } from '@/db/categories';
 import { initDb } from '@/db/init';
 import { listSettings } from '@/db/settings';
-import { DbVersionProvider } from '@/hooks/DbVersionContext';
 import { CATEGORIES_KEY } from '@/hooks/useCategories';
 import { primeQuery } from '@/hooks/useDbQuery';
 import { SETTINGS_KEY } from '@/hooks/useSettings';
@@ -100,14 +99,12 @@ export default function RootLayout() {
           }}
         />
       ) : ready ? (
-        <DbVersionProvider>
-          <ToastProvider>
-            <StatusBar style="dark" />
-            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}>
-              <Stack.Screen name="(tabs)" />
-            </Stack>
-          </ToastProvider>
-        </DbVersionProvider>
+        <ToastProvider>
+          <StatusBar style="dark" />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.ground } }}>
+            <Stack.Screen name="(tabs)" />
+          </Stack>
+        </ToastProvider>
       ) : null}
     </>
   );

@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
-import { endOfDay, startOfDay } from 'date-fns';
+import { endOfDay } from 'date-fns/endOfDay';
+import { startOfDay } from 'date-fns/startOfDay';
 
 import {
   deleteTimeBlock,
@@ -11,18 +12,19 @@ import {
   type TimeBlockInput,
 } from '@/db/timeBlocks';
 import type { TimeBlock } from '@/lib/types';
-import { useWrite } from './DbVersionContext';
+import { useWrite, type Table } from './tableVersions';
 import { useDbQuery } from './useDbQuery';
 
 const NONE: TimeBlock[] = [];
+const TIME: Table[] = ['time'];
 
 /** `ready` is false until this exact day's entries have loaded. */
 export function useTimeBlocksForDay(day: Date) {
-  const write = useWrite();
+  const write = useWrite(TIME);
   const startIso = startOfDay(day).toISOString();
   const endIso = endOfDay(day).toISOString();
   const read = useCallback(() => listTimeBlocksForRange(startIso, endIso), [startIso, endIso]);
-  const { data: blocks, current: ready, loaded } = useDbQuery(`day:${startIso}`, read, NONE);
+  const { data: blocks, current: ready, loaded } = useDbQuery(`day:${startIso}`, TIME, read, NONE);
 
   const add = useCallback((input: TimeBlockInput) => write(() => insertTimeBlock(input)), [write]);
   const update = useCallback(
@@ -38,7 +40,7 @@ export function useTimeBlocksForRange(rangeStart: Date, rangeEnd: Date) {
   const startIso = rangeStart.toISOString();
   const endIso = rangeEnd.toISOString();
   const read = useCallback(() => listTimeBlocksForRange(startIso, endIso), [startIso, endIso]);
-  const { data, current, loaded } = useDbQuery(`range:${startIso}:${endIso}`, read, NONE);
+  const { data, current, loaded } = useDbQuery(`range:${startIso}:${endIso}`, TIME, read, NONE);
   return { blocks: data, ready: current, loaded };
 }
 
@@ -47,10 +49,10 @@ export function useTimeBlocksForRange(rangeStart: Date, rangeEnd: Date) {
  * the app didn't exist for you yet. Null until the first entry is saved.
  */
 export function useTrackingStart(): Date | null {
-  const iso = useDbQuery<string | null>('firstStart', getFirstStart, null).data;
+  const iso = useDbQuery<string | null>('firstStart', TIME, getFirstStart, null).data;
   return useMemo(() => (iso ? new Date(iso) : null), [iso]);
 }
 
 export function useLastTimeBlock(): TimeBlock | null {
-  return useDbQuery<TimeBlock | null>('lastBlock', getLastTimeBlock, null).data;
+  return useDbQuery<TimeBlock | null>('lastBlock', TIME, getLastTimeBlock, null).data;
 }
