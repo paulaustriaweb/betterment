@@ -189,7 +189,7 @@ src/
 ```
 
 ### State pattern (no library, and here's exactly how that stays sane)
-Each domain hook (`useTimeBlocks`, etc.) queries SQLite on mount, exposes the data plus mutation functions (`add`, `update`, `remove`), and after any mutation increments a tiny shared counter (React Context, one `number`, call it `dbVersion`) that other hooks watching the same table depend on in their `useEffect` — so a write in the Log tab shows up next time Home re-renders, without a query library. ~30 lines total. If this ever gets genuinely painful, revisit with `@tanstack/react-query` (Expo Go compatible, not banned — just unnecessary at this size).
+Each domain hook (`useTimeBlocks`, etc.) reads through `useDbQuery(key, tables, read, fallback)` and exposes mutation functions (`add`, `update`, `remove`) wrapped in `useWrite(tables)`. A write bumps a per-table version (`hooks/tableVersions.ts`, a tiny store read with `useSyncExternalStore`), and only queries that depend on that table re-read — saving a time entry no longer re-renders Money or Goals, or re-reads settings and categories. If this ever gets genuinely painful, revisit with `@tanstack/react-query` (Expo Go compatible, not banned — just unnecessary at this size).
 
 ### Schema migrations (new — not in the original prototype notes)
 This app is meant to hold a year+ of nightly data. The schema **will** change (Phase 2 features are already planned). Use SQLite's `PRAGMA user_version` plus an ordered array of migration functions run at startup:
@@ -382,7 +382,7 @@ build been opened on an actual iPhone yet — that is the one remaining check th
 because iOS Safari is the shipping platform and it is the browser least like the one it was
 tested in.
 
-`tsc`, `expo lint`, 74 Jest tests and `expo export --platform web` are all clean.
+`tsc`, `expo lint`, 131 Jest tests and `expo export --platform web` are all clean.
 Tests cover `lib/` only — the date arithmetic, gap detection, money sums, goal countdowns,
 currency validation, backup-file validation. There are no component tests; the UI was checked by using it.
 
@@ -456,6 +456,13 @@ survived.
 - Settings grouped (Your day · App · Your data): targets, night-ends hour (drives
   "Tonight"), vibration toggle (`lib/haptics.ts` — all feedback goes through it), add
   a category, erase everything logged.
+- **Compared with last time** (`lib/insights.ts`): "Where it went" shows each activity
+  against the same stretch yesterday / last week / last month, up to the same point,
+  and Overview's row carries the biggest swing. Only compared when the previous stretch
+  was tracked from its start. **Awake after 11 PM** counts non-sleep time from 11 PM to
+  the night-ends hour.
+- 2026-09-27 optimisation: web bundle 1,717 → ~1,510 KB (date-fns per-function imports,
+  `notifications.web.ts` stub instead of expo-notifications).
 - Launch screen in `+html.tsx` (removed by `hideLaunchScreen` once ready), persistent
   storage requested on web, backup-due dot on Settings (`lib/backupDue.ts`), header
   respects the top safe-area inset.
@@ -468,9 +475,10 @@ launch from the home screen.
 
 ### 2. Categories can only be renamed or hidden, not added. Dynamic Type unverified.
 
-### 3. Service worker keeps old hashed bundles
-Each deploy adds ~2 MB of `/_expo` files to the cache; old ones are never pruned. Harmless
-for a long while. Bump `CACHE` in `public/sw.js` to reset it.
+### 3. Service worker cache
+Old app bundles are pruned once the page reports the one it runs (verified: a second
+deploy leaves only the new `entry-*.js` cached). Other hashed assets still accumulate
+slowly; bump `CACHE` in `public/sw.js` to reset everything.
 
 ---
 
@@ -481,8 +489,11 @@ of them will reintroduce a failure that took a long time to find.
 
 - **Reads never throw into render.** `useDbQuery` loads in an effect; a failed read
   logs and keeps the last value.
-- **`bump()` runs in `finally`** (`useWrite` in `DbVersionContext`). A failed write may
-  well have landed; the UI has to show what is actually stored.
+- **Tables are bumped in `finally`** (`useWrite` in `hooks/tableVersions.ts`). A failed
+  write may well have landed; the UI has to show what is actually stored. A write that
+  touches everything (restore, erase) passes `ALL_TABLES`.
+- **Import date-fns per function** (`import { format } from 'date-fns/format'`). Metro
+  doesn't tree-shake; the barrel import shipped all of date-fns (~125 KB extra).
 - **Every write path has try/catch and says something** — inline where the action
   happened, plus a toast. `Alert.alert` is a **no-op** on react-native-web; never use
   it. That is why Save silently did nothing for a whole session.

@@ -1,26 +1,27 @@
-import {
-  addDays,
-  addMonths,
-  addWeeks,
-  eachDayOfInterval,
-  format,
-  isSameDay,
-  startOfDay,
-  startOfMonth,
-  startOfWeek,
-  subDays,
-} from 'date-fns';
+import { addDays } from 'date-fns/addDays';
+import { addMonths } from 'date-fns/addMonths';
+import { addWeeks } from 'date-fns/addWeeks';
+import { eachDayOfInterval } from 'date-fns/eachDayOfInterval';
+import { format } from 'date-fns/format';
+import { isSameDay } from 'date-fns/isSameDay';
+import { startOfDay } from 'date-fns/startOfDay';
+import { startOfMonth } from 'date-fns/startOfMonth';
+import { startOfWeek } from 'date-fns/startOfWeek';
+import { subDays } from 'date-fns/subDays';
+import { subMonths } from 'date-fns/subMonths';
+import { subWeeks } from 'date-fns/subWeeks';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CategoriesSheet } from '@/components/CategoriesSheet';
 import { CategoryBar } from '@/components/CategoryBar';
 import { ReminderSheet } from '@/components/ReminderSheet';
 import { SettingsSheet } from '@/components/SettingsSheet';
 import { TargetsSheet } from '@/components/TargetsSheet';
+import { WhereItWentSheet } from '@/components/WhereItWentSheet';
 import { CheckIcon, GearIcon, PlusIcon, TimelineIcon } from '@/components/icons';
-import { DisclosureRow, PrimaryButton, RangePills, ScreenHeader, Sheet, StatCard } from '@/components/ui';
+import { DisclosureRow, PrimaryButton, RangePills, ScreenHeader, StatCard } from '@/components/ui';
 import { useCategories } from '@/hooks/useCategories';
 import { useNow } from '@/hooks/useNow';
 import { useSetting } from '@/hooks/useSettings';
@@ -28,10 +29,10 @@ import { useTimeBlocksForRange, useTrackingStart } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, type } from '@/lib/colors';
 import { fitFontSize } from '@/lib/fit';
 import { backupDue } from '@/lib/backupDue';
+import { awakeLate, biggestChange, compareSlices } from '@/lib/insights';
 import { buildReport } from '@/lib/report';
 import { evaluateTargets, parseTargets } from '@/lib/targets';
-import { formatDuration, formatHoursPadded, greeting } from '@/lib/time';
-
+import { capAtNow, formatDuration, formatHoursPadded, greeting, minutesByCategory } from '@/lib/time';
 
 /**
  * A report of where the time went — logged once a night, read the next morning.
@@ -101,8 +102,32 @@ export default function OverviewScreen() {
   const targetChecks = targetResults.reduce((sum, r) => sum + r.days.length, 0);
   const targetsMet = targetResults.reduce((sum, r) => sum + r.metDays, 0);
 
+  // The same stretch last time — yesterday, last week or last month, up to the same
+  // point — so a week in progress isn't compared against a whole one.
+  const { prevStart, prevEnd } = useMemo(() => {
+    const back = (d: Date) => (range === 'week' ? subWeeks(d, 1) : range === 'month' ? subMonths(d, 1) : subDays(d, 1));
+    const end = back(capAtNow(rangeEnd, now));
+    return { prevStart: back(rangeStart), prevEnd: end < rangeStart ? end : rangeStart };
+  }, [range, rangeStart, rangeEnd, now]);
+  const { blocks: prevBlocks } = useTimeBlocksForRange(prevStart, prevEnd);
+  // Only a previous stretch that was tracked from its start is a fair comparison — a
+  // half-tracked August makes every September activity look like it went up.
+  const comparable = trackingStart !== null && trackingStart <= prevStart;
+  const changes = useMemo(() => {
+    const previous = comparable
+      ? [...minutesByCategory(prevBlocks, prevStart, prevEnd)].map(([categoryId, minutes]) => ({ categoryId, minutes }))
+      : [];
+    return compareSlices(report.slices, previous);
+  }, [comparable, prevBlocks, prevStart, prevEnd, report.slices]);
+  const compareLabel = !comparable ? null : range === 'week' ? 'vs last week' : range === 'month' ? 'vs last month' : 'vs yesterday';
+  const insight = comparable ? biggestChange(changes) : null;
+
+  const late = useMemo(() => {
+    const sleep = new Set(categories.filter((c) => /sleep/i.test(c.name)).map((c) => c.id));
+    return awakeLate(blocks, targetDays, now, sleep, Number(nightEndsSetting) || 0);
+  }, [blocks, targetDays, now, categories, nightEndsSetting]);
+
   const nameOf = (id: number) => categories.find((c) => c.id === id)?.name ?? 'Other';
-  const colorOf = (id: number) => categories.find((c) => c.id === id)?.color ?? colors.inkFaint;
   const sliceTotal = report.slices.reduce((sum, s) => sum + s.minutes, 0);
   const share = (minutes: number) => (sliceTotal > 0 ? Math.round((minutes / sliceTotal) * 100) : 0);
   const leader = report.slices[0];
@@ -202,7 +227,11 @@ export default function OverviewScreen() {
             hint={
               report.slices.length === 0
                 ? 'Nothing logged yet'
-                : `${report.slices.length} ${report.slices.length === 1 ? 'activity' : 'activities'} · tap to see`
+                : insight
+                  ? `${nameOf(insight.categoryId)} ${insight.delta > 0 ? '▲' : '▼'} ${formatDuration(Math.abs(insight.delta))} ${compareLabel}`
+                  : late.minutes >= 30 && late.slices[0]
+                    ? `${formatDuration(late.minutes)} awake after 11 PM`
+                    : `${report.slices.length} ${report.slices.length === 1 ? 'activity' : 'activities'} · tap to see`
             }
             onPress={() => setSheetOpen(true)}
           />
@@ -233,36 +262,16 @@ export default function OverviewScreen() {
         </View>
       </View>
 
-      <Sheet visible={sheetOpen} title="Where it went" subtitle={rangeCaption} onClose={() => setSheetOpen(false)}>
-        {report.slices.length === 0 ? (
-          <Text style={styles.empty}>Nothing logged here yet.</Text>
-        ) : (
-          <ScrollView style={styles.sheetScroll}>
-            {report.slices.map((s) => {
-              const pct = share(s.minutes);
-              return (
-                <View key={s.categoryId} style={styles.breakdownRow}>
-                  <View style={styles.breakdownTop}>
-                    <View style={[styles.dot, { backgroundColor: colorOf(s.categoryId) }]} />
-                    <Text style={styles.breakdownLabel}>{nameOf(s.categoryId)}</Text>
-                    <Text style={styles.breakdownValue}>{formatDuration(s.minutes)}</Text>
-                    <Text style={styles.breakdownPct}>{pct}%</Text>
-                  </View>
-                  <View style={styles.barTrack}>
-                    <View style={[styles.barFill, { width: `${pct}%`, backgroundColor: colorOf(s.categoryId) }]} />
-                  </View>
-                </View>
-              );
-            })}
-            {!isToday && report.unloggedPast > 0 ? (
-              <Text style={styles.footnote}>
-                {formatDuration(report.unloggedPast)} went unlogged on days that are over. Tap a gap on Day to fill
-                it in.
-              </Text>
-            ) : null}
-          </ScrollView>
-        )}
-      </Sheet>
+      <WhereItWentSheet
+        visible={sheetOpen}
+        subtitle={rangeCaption}
+        changes={changes}
+        compareLabel={compareLabel}
+        late={late}
+        unloggedPast={isToday || !trackingStart ? null : report.unloggedPast}
+        categories={categories}
+        onClose={() => setSheetOpen(false)}
+      />
 
       <SettingsSheet
         visible={settingsOpen}
@@ -344,24 +353,4 @@ const styles = StyleSheet.create({
   statRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
   disclosure: { marginTop: 18, gap: 8 },
   action: { marginTop: 'auto', marginBottom: 20 },
-
-  sheetScroll: { marginTop: 16, maxHeight: 360 },
-  breakdownRow: { marginBottom: 15 },
-  breakdownTop: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  dot: { width: 9, height: 9, borderRadius: 5 },
-  breakdownLabel: { flex: 1, fontFamily: font.medium, fontSize: 13, color: colors.ink },
-  breakdownValue: { fontFamily: font.bold, fontSize: 13, color: colors.ink, fontVariant: ['tabular-nums'] },
-  breakdownPct: {
-    width: 38,
-    textAlign: 'right',
-    fontFamily: font.regular,
-    fontSize: 11.5,
-    color: colors.inkSoft,
-    fontVariant: ['tabular-nums'],
-  },
-  barTrack: { height: 6, borderRadius: 3, backgroundColor: '#F6EDF0', marginTop: 7, overflow: 'hidden' },
-  barFill: { height: 6, borderRadius: 3 },
-  footnote: { fontFamily: font.regular, fontSize: 11.5, color: colors.inkSoft, lineHeight: 17, marginTop: 4, marginBottom: 8 },
-
-  empty: { fontFamily: font.regular, fontSize: 13, color: colors.inkSoft, paddingVertical: 20 },
 });
