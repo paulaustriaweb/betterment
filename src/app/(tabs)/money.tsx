@@ -13,7 +13,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AddTransactionSheet } from '@/components/AddTransactionSheet';
 import { Banner } from '@/components/Banner';
-import { Sparkline } from '@/components/Sparkline';
+import { TrendChart } from '@/components/TrendChart';
 import { SwipeRow } from '@/components/SwipeRow';
 import { useToast } from '@/components/Toast';
 import { MoneyIcon, PlusIcon } from '@/components/icons';
@@ -66,7 +66,8 @@ export default function MoneyScreen() {
   const earned = sumByType(transactions, 'income');
   const net = earned - spent;
 
-  // Running balance across the range — one point per day, or per month for a year.
+  // Running balance across the range — one point per day, or per month for a year —
+  // drawn only up to now, so a month in progress reads as half-way through.
   const trend = useMemo(() => {
     const byMonth = range === 'year';
     const end = subDays(rangeEnd, 1);
@@ -77,8 +78,13 @@ export default function MoneyScreen() {
       const bucketEnd = byMonth ? addMonths(bucketStart, 1) : addDays(bucketStart, 1);
       return netOf(withinRange(transactions, bucketStart, bucketEnd));
     });
-    return cumulative(perBucket);
-  }, [transactions, rangeStart, rangeEnd, range]);
+    const sofar = buckets.filter((b) => b <= now).length;
+    return {
+      values: cumulative(perBucket).slice(0, sofar),
+      labels: buckets.map((b) => format(b, byMonth ? 'MMM' : 'MMM d')),
+      slots: buckets.length,
+    };
+  }, [transactions, rangeStart, rangeEnd, range, now]);
 
   async function handleDelete(id: number) {
     const gone = transactions.find((t) => t.id === id);
@@ -147,9 +153,14 @@ export default function MoneyScreen() {
             {formatCurrency(spent, currency)} out · {formatCurrency(earned, currency)} in
           </Text>
 
-          {trend.length > 1 ? (
+          {transactions.length > 0 && trend.values.length > 1 ? (
             <View style={styles.spark}>
-              <Sparkline values={trend} label={transactions.length === 0 ? '—' : formatSigned(net, currency)} />
+              <TrendChart
+                values={trend.values}
+                slots={trend.slots}
+                labels={trend.labels}
+                format={(v) => formatSigned(v, currency)}
+              />
             </View>
           ) : (
             <Text style={styles.heroEmpty}>Nothing added {rangeLabel.toLowerCase()} yet.</Text>

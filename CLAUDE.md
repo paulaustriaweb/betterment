@@ -382,7 +382,7 @@ build been opened on an actual iPhone yet — that is the one remaining check th
 because iOS Safari is the shipping platform and it is the browser least like the one it was
 tested in.
 
-`tsc`, `expo lint`, 131 Jest tests and `expo export --platform web` are all clean.
+`tsc`, `expo lint`, 138 Jest tests and `expo export --platform web` are all clean.
 Tests cover `lib/` only — the date arithmetic, gap detection, money sums, goal countdowns,
 currency validation, backup-file validation. There are no component tests; the UI was checked by using it.
 
@@ -461,6 +461,16 @@ survived.
   and Overview's row carries the biggest swing. Only compared when the previous stretch
   was tracked from its start. **Awake after 11 PM** counts non-sleep time from 11 PM to
   the night-ends hour.
+- **Charts** (2026-09-27): Overview's hero is a Screen Time–style `ActivityChart` —
+  24 hourly bars for Today/Tonight, one bar per day for week/month, each out of its
+  full length so the empty part is unlogged time; dashed daily average; touch-and-drag
+  to read a bar (the hero number and caption follow). Money's hero is a Stocks-style
+  `TrendChart` — monotone curve (`lib/curve.ts`, never overshoots its data), drawn up
+  to today only, dashed zero line, scrub to read any day. Data in `lib/chartData.ts`.
+  Both are plain Views/SVG — still no chart library, still no gradients.
+- **DB open retries a transient lock** (`db/init.ts`): a reload or quick relaunch can
+  start before the old page releases OPFS; it retries for ~3s before "Open somewhere
+  else". Reproduced in headless Edge before the fix, gone after.
 - 2026-09-27 optimisation: web bundle 1,717 → ~1,510 KB (date-fns per-function imports,
   `notifications.web.ts` stub instead of expo-notifications).
 - Launch screen in `+html.tsx` (removed by `hideLaunchScreen` once ready), persistent

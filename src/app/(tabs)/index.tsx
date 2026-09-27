@@ -15,7 +15,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CategoriesSheet } from '@/components/CategoriesSheet';
-import { CategoryBar } from '@/components/CategoryBar';
+import { ActivityChart } from '@/components/ActivityChart';
 import { ReminderSheet } from '@/components/ReminderSheet';
 import { SettingsSheet } from '@/components/SettingsSheet';
 import { TargetsSheet } from '@/components/TargetsSheet';
@@ -29,6 +29,7 @@ import { useTimeBlocksForRange, useTrackingStart } from '@/hooks/useTimeBlocks';
 import { colors, font, spacing, type } from '@/lib/colors';
 import { fitFontSize } from '@/lib/fit';
 import { backupDue } from '@/lib/backupDue';
+import { dailyColumns, hourlyColumns } from '@/lib/chartData';
 import { awakeLate, biggestChange, compareSlices } from '@/lib/insights';
 import { buildReport } from '@/lib/report';
 import { evaluateTargets, parseTargets } from '@/lib/targets';
@@ -43,6 +44,8 @@ export default function OverviewScreen() {
   const router = useRouter();
   const now = useNow();
   const [range, setRange] = useState('today');
+  // The bar being read on the chart — null shows the summary.
+  const [selectedBar, setSelectedBar] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
@@ -128,6 +131,34 @@ export default function OverviewScreen() {
   }, [blocks, targetDays, now, categories, nightEndsSetting]);
 
   const nameOf = (id: number) => categories.find((c) => c.id === id)?.name ?? 'Other';
+
+  // Today: 24 hourly bars — when things happened. Week and month: a bar per day, each
+  // out of 24 hours, so the empty part of a bar is what went unlogged.
+  const columns = useMemo(() => {
+    if (range === 'today') return hourlyColumns(blocks, rangeStart, now);
+    const days = eachDayOfInterval({ start: rangeStart, end: subDays(rangeEnd, 1) });
+    return dailyColumns(blocks, days, now);
+  }, [range, blocks, rangeStart, rangeEnd, now]);
+  const axis =
+    range === 'today'
+      ? [
+          { index: 0, label: '12a' },
+          { index: 6, label: '6a' },
+          { index: 12, label: '12p' },
+          { index: 18, label: '6p' },
+        ]
+      : range === 'week'
+        ? columns.map((c, i) => ({ index: i, label: format(c.start, 'EEEEE') }))
+        : columns.filter((_, i) => i % 7 === 0).map((c) => ({ index: columns.indexOf(c), label: format(c.start, 'd') }));
+  const bar = selectedBar !== null ? columns[selectedBar] : null;
+  const barLead = bar ? [...bar.segments].sort((a, b) => b.minutes - a.minutes)[0] : null;
+  const barCaption = bar
+    ? `${
+        range === 'today'
+          ? `${format(bar.start, 'h a')} – ${format(new Date(bar.start.getTime() + 3600000), 'h a')}`
+          : format(bar.start, 'EEE, MMM d')
+      } · ${bar.total === 0 ? 'nothing logged' : `mostly ${nameOf(barLead?.categoryId ?? 0)}`}`
+    : null;
   const sliceTotal = report.slices.reduce((sum, s) => sum + s.minutes, 0);
   const share = (minutes: number) => (sliceTotal > 0 ? Math.round((minutes / sliceTotal) * 100) : 0);
   const leader = report.slices[0];
@@ -186,7 +217,14 @@ export default function OverviewScreen() {
         />
 
         <View style={styles.pills}>
-          <RangePills options={ranges} value={range} onChange={setRange} />
+          <RangePills
+            options={ranges}
+            value={range}
+            onChange={(next) => {
+              setRange(next);
+              setSelectedBar(null);
+            }}
+          />
         </View>
 
         <View style={styles.hero} accessible accessibilityLabel={`Logged ${formatDuration(report.logged)}. ${heroCaption}`}>
@@ -201,18 +239,29 @@ export default function OverviewScreen() {
           </View>
 
           <Text
-            style={[styles.heroValue, { fontSize: fitFontSize(formatHoursPadded(report.logged), 48, 8) }]}
+            style={[
+              styles.heroValue,
+              { fontSize: fitFontSize(formatHoursPadded(bar ? bar.total : report.logged), 48, 8) },
+            ]}
             numberOfLines={1}
           >
-            {formatHoursPadded(report.logged)}
+            {formatHoursPadded(bar ? bar.total : report.logged)}
+          </Text>
+          <Text style={styles.heroSub} numberOfLines={1}>
+            {barCaption ?? heroCaption}
           </Text>
 
           <View style={styles.bar}>
-            <CategoryBar slices={report.slices} categories={categories} />
+            <ActivityChart
+              columns={columns}
+              categories={categories}
+              axis={axis}
+              average={range !== 'today' && report.trackedDays > 0 ? report.logged / report.trackedDays : null}
+              selected={selectedBar}
+              onSelect={setSelectedBar}
+              animateKey={`${range}|${rangeStart.toISOString()}`}
+            />
           </View>
-          <Text style={styles.heroSub} numberOfLines={2}>
-            {heroCaption}
-          </Text>
         </View>
 
         <View style={styles.statRow}>
@@ -347,8 +396,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontVariant: ['tabular-nums'],
   },
-  bar: { marginTop: 16 },
-  heroSub: { fontFamily: font.regular, fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 10, lineHeight: 17 },
+  bar: { marginTop: 14 },
+  heroSub: { fontFamily: font.regular, fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 4, lineHeight: 17 },
 
   statRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
   disclosure: { marginTop: 18, gap: 8 },
