@@ -1,4 +1,4 @@
-import { openDb } from './client';
+import { forgetDb, openDb } from './client';
 import { runMigrations } from './migrations';
 import { seedIfEmpty } from './seed';
 
@@ -30,17 +30,40 @@ function explain(error: unknown): Error {
 }
 
 /**
+ * A reload or quick relaunch starts the new page while the old one is still letting
+ * go of the OPFS lock, so the first open can fail for a moment. Waiting it out (about
+ * three seconds in all) turns that race into a short pause; a genuine second tab is
+ * still reported once these run out.
+ */
+const LOCK_RETRY_MS = [200, 400, 800, 1600];
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function open(): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const db = await openDb();
+      await runMigrations(db);
+      await seedIfEmpty(db);
+      return;
+    } catch (error) {
+      const text = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      if (!LOCKED.test(text) || attempt >= LOCK_RETRY_MS.length) throw error;
+      // Drop any half-open handle so the next attempt starts clean.
+      forgetDb();
+      await wait(LOCK_RETRY_MS[attempt]);
+    }
+  }
+}
+
+/**
  * Idempotent. Nothing may query the database until the returned promise resolves.
  * A failure clears the cached promise, so retrying actually retries instead of
  * handing back the same rejection for the rest of the session.
  */
 export function initDb(): Promise<void> {
   if (!ready) {
-    ready = (async () => {
-      const db = await openDb();
-      await runMigrations(db);
-      await seedIfEmpty(db);
-    })().catch((error: unknown) => {
+    ready = open().catch((error: unknown) => {
       ready = null;
       throw explain(error);
     });
