@@ -1,9 +1,16 @@
-import * as haptics from '@/lib/haptics';
-import { useMemo, useState, type ReactNode } from 'react';
-import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import * as haptics from "@/lib/haptics";
+import { useMemo, useState, type ReactNode } from "react";
+import {
+  Animated,
+  PanResponder,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import { colors, font } from '@/lib/colors';
-import { TrashIcon } from './icons';
+import { colors, font } from "@/lib/colors";
+import { TrashIcon } from "./icons";
 
 const ACTION_WIDTH = 88;
 const OVERSHOOT = 20;
@@ -33,7 +40,9 @@ export function SwipeRow({ children, onDelete }: Props) {
           Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
         onPanResponderMove: (_, g) => {
           const base = open ? -ACTION_WIDTH : 0;
-          translateX.setValue(Math.min(0, Math.max(-ACTION_WIDTH - OVERSHOOT, base + g.dx)));
+          translateX.setValue(
+            Math.min(0, Math.max(-ACTION_WIDTH - OVERSHOOT, base + g.dx)),
+          );
         },
         onPanResponderRelease: (_, g) => {
           const base = open ? -ACTION_WIDTH : 0;
@@ -48,7 +57,7 @@ export function SwipeRow({ children, onDelete }: Props) {
           }).start();
         },
       }),
-    [open, translateX]
+    [open, translateX],
   );
 
   function confirmDelete() {
@@ -58,12 +67,20 @@ export function SwipeRow({ children, onDelete }: Props) {
 
   return (
     <View style={styles.wrap}>
-      <Pressable style={styles.action} onPress={confirmDelete} accessibilityRole="button" accessibilityLabel="Delete">
+      <Pressable
+        style={styles.action}
+        onPress={confirmDelete}
+        accessibilityRole="button"
+        accessibilityLabel="Delete"
+      >
         <TrashIcon color={colors.surface} />
         <Text style={styles.actionLabel}>Delete</Text>
       </Pressable>
 
-      <Animated.View style={[styles.front, { transform: [{ translateX }] }]} {...responder.panHandlers}>
+      <Animated.View
+        style={[styles.front, { transform: [{ translateX }] }]}
+        {...responder.panHandlers}
+      >
         {children}
       </Animated.View>
     </View>
@@ -71,19 +88,23 @@ export function SwipeRow({ children, onDelete }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { justifyContent: 'center' },
+  wrap: { justifyContent: "center" },
   action: {
-    position: 'absolute',
+    position: "absolute",
     right: 0,
     top: 0,
     bottom: 0,
     width: ACTION_WIDTH,
     backgroundColor: colors.danger,
     borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: 3,
   },
-  actionLabel: { fontFamily: font.semibold, fontSize: 11, color: colors.surface },
+  actionLabel: {
+    fontFamily: font.semibold,
+    fontSize: 11,
+    color: colors.surface,
+  },
   front: { backgroundColor: colors.surface },
 });
